@@ -60,12 +60,21 @@ object PhoneSync {
         if (job?.isActive == true) return
         val app = context.applicationContext
         job = ownScope.launch {
-            val socket = runCatching { ServerSocket(port) }.getOrElse {
+            // Listen on the Tailscale address only, never on Wi-Fi, mobile data or a hotspot.
+            // Some carriers and public networks also use 100.64.x.x, so the address check alone isn't enough.
+            var address = tailscaleAddress()
+            while (address == null) {
+                status.value = "Waiting for Tailscale to connect on this phone…"
+                delay(30_000)
+                address = tailscaleAddress()
+            }
+            val socket = runCatching { ServerSocket(port, 50, InetAddress.getByName(address)) }.getOrElse {
                 AppLog.w("Phone sync couldn't open port $port: $it")
                 return@launch
             }
             server = socket
-            AppLog.i("Phone sync: serving on port $port")
+            if (status.value.startsWith("Waiting for Tailscale")) status.value = ""
+            AppLog.i("Phone sync: serving on Tailscale, port $port")
             try {
                 while (isActive) {
                     val client = runCatching { socket.accept() }.getOrNull() ?: break
@@ -178,11 +187,18 @@ object PhoneSync {
         message
     }
 
-    /** A bare HTTP request over a socket (Android's HTTP client won't do plain HTTP to arbitrary tailnet addresses). */
+    /**
+     * A bare HTTP request over a socket (Android's HTTP client won't do plain HTTP to arbitrary
+     * tailnet addresses). Only to Tailscale addresses, where WireGuard encrypts the traffic.
+     */
     private fun request(host: String, method: String, path: String, body: String?): Pair<Int, String> {
         val (name, port) = host.substringBefore(':') to (host.substringAfter(':', "").toIntOrNull() ?: PORT)
+        val target = InetAddress.getByName(name)
+        if (target.isLoopbackAddress || !isTailnet(target)) {
+            throw IOException("$name isn't a Tailscale address (100.x.x.x or a .ts.net name) - Siren only syncs over Tailscale")
+        }
         Socket().use { s ->
-            s.connect(InetSocketAddress(name, port), 10_000)
+            s.connect(InetSocketAddress(target, port), 10_000)
             s.soTimeout = 60_000
             val bytes = body?.toByteArray() ?: ByteArray(0)
             val out = s.getOutputStream()

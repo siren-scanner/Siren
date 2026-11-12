@@ -1040,13 +1040,14 @@ internal fun CarDisplaySettings(prefs: Prefs) {
     var on by remember { mutableStateOf(prefs.carDisplay) }
     var code by remember { mutableStateOf(prefs.carCode) }
     // Interfaces come and go (hotspot, USB tethering), so re-check every few seconds.
-    val addresses by produceState(CarDisplay.addresses(), on) {
+    var onWifi by remember { mutableStateOf(prefs.carOnWifi) }
+    val addresses by produceState(CarDisplay.servingAddresses(), on, onWifi) {
         while (true) {
-            value = CarDisplay.addresses()
+            value = CarDisplay.servingAddresses()
             delay(3_000)
         }
     }
-    Text("Car display (test)", style = MaterialTheme.typography.titleSmall)
+    Text("Car display (experimental)", style = MaterialTheme.typography.titleSmall)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("Show Siren in another screen's browser")
@@ -1063,6 +1064,11 @@ internal fun CarDisplaySettings(prefs: Prefs) {
         })
     }
     if (on) {
+        SettingRow(
+            "Also on Wi-Fi networks",
+            "For a car or screen on the same Wi-Fi as the phone, like at home. Anyone else on that network could try the page's address, so only use networks you trust.",
+            onWifi,
+        ) { onWifi = it; prefs.carOnWifi = it; CarDisplay.allowWifi = it }
         if (!status.running) {
             Text("Press Start, then open one of these addresses:", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFFB300))
         } else {

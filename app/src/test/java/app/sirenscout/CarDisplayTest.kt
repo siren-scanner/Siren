@@ -67,4 +67,17 @@ class CarDisplayTest {
             File(dir, "state").writeText(body)
         }
     }
+
+    @Test
+    fun `ignores an address after repeated wrong codes`() {
+        CarDisplay.start("abc23456", PORT)
+        assertEquals("HTTP/1.1 200 OK", get("/abc23456/state").first)
+        repeat(10) { assertEquals("HTTP/1.1 404 Not Found", get("/guess$it/state").first) }
+        assertEquals("locked out, even with the right code", "", get("/abc23456/state").first)
+    }
+
+    @Test
+    fun `new codes are 8 characters`() {
+        assertTrue(Regex("^[a-z2-9]{8}$").matches(CarDisplay.newCode()))
+    }
 }

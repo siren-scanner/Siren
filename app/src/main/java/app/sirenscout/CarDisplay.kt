@@ -18,9 +18,10 @@ import java.net.Socket
 import java.security.SecureRandom
 
 /**
- * A small web page served from the phone, so another screen on the same local network - like a
- * car's browser on the phone's hotspot - can show Siren's alerts live. Only private-network
- * clients that know the secret code in the address get anything back.
+ * A small web page served from the phone, so another screen - like a car's browser on the
+ * phone's hotspot - can show Siren's alerts live. It only answers on the hotspot and USB
+ * tethering (and Wi-Fi networks, if the user allows that), only to clients that know the secret
+ * code in the address, and ignores an address after repeated wrong codes.
  */
 object CarDisplay {
     /** 8080 for Siren, 8081 for Siren Test, so both can serve a page at once. */
@@ -42,6 +43,13 @@ object CarDisplay {
     @Volatile var error: String? = null
         private set
 
+    /** Also answer on Wi-Fi networks the phone has joined (off: hotspot and USB tethering only). */
+    @Volatile var allowWifi = false
+
+    /** Wrong codes per address; after this many, that address is ignored until the page restarts. */
+    private const val MAX_FAILURES = 10
+    private val failures = HashMap<String, Int>()
+
     /** Records an alert for the page to show; called wherever a notification goes out. */
     fun publishAlert(title: String, text: String) {
         lastAlert = Alert(title, text, System.currentTimeMillis())
@@ -50,7 +58,7 @@ object CarDisplay {
     fun newCode(): String {
         val alphabet = "abcdefghjkmnpqrstuvwxyz23456789" // no look-alikes, easy to type on a car screen
         val rnd = SecureRandom()
-        return (1..6).map { alphabet[rnd.nextInt(alphabet.length)] }.joinToString("")
+        return (1..8).map { alphabet[rnd.nextInt(alphabet.length)] }.joinToString("")
     }
 
     @Synchronized
@@ -85,6 +93,7 @@ object CarDisplay {
         runCatching { server?.close() }
         server = null
         serving = false
+        synchronized(failures) { failures.clear() }
         job?.cancel()
         job = null
     }
@@ -104,7 +113,9 @@ object CarDisplay {
         if (loggedClients.add(from)) {
             AppLog.i("Car display: connection from $from to ${client.localAddress.hostAddress}${if (isPrivate(client.inetAddress)) "" else " (refused: not a private network)"}")
         }
-        if (!isPrivate(client.inetAddress)) return // not from a local / hotspot / tailnet device
+        if (!isPrivate(client.inetAddress)) return // not from a local / hotspot device
+        if (!allowedHere(client.localAddress)) return // e.g. someone else on a café's Wi-Fi
+        if ((synchronized(failures) { failures[from] } ?: 0) >= MAX_FAILURES) return
         val reader = client.getInputStream().bufferedReader()
         val requestLine = reader.readLine() ?: return
         while (true) { val h = reader.readLine() ?: break; if (h.isEmpty()) break } // skip headers
@@ -125,9 +136,28 @@ object CarDisplay {
             "/$code" -> send("302 Found", "text/plain", "", "Location: /$code/\r\n")
             "/$code/" -> send("200 OK", "text/html; charset=utf-8", PAGE)
             "/$code/state" -> send("200 OK", "application/json", state().toString())
-            else -> send("404 Not Found", "text/plain", "Not found")
+            else -> {
+                synchronized(failures) { failures[from] = (failures[from] ?: 0) + 1 }
+                send("404 Not Found", "text/plain", "Not found")
+            }
         }
     }
+
+    /** Whether the connection came in over the hotspot, USB tethering, or Wi-Fi if allowed. */
+    private fun allowedHere(local: InetAddress): Boolean {
+        if (local.isLoopbackAddress) return true
+        val ip = local.hostAddress ?: return false
+        val name = runCatching { NetworkInterface.getByInetAddress(local)?.name }.getOrNull() ?: return false
+        return when (kind(name, ip)) {
+            "Hotspot", "USB tethering", "Other" -> true
+            "Wi-Fi" -> allowWifi
+            else -> false // Tailscale, mobile data
+        }
+    }
+
+    /** The addresses the page can be opened on right now. */
+    fun servingAddresses(): List<Pair<String, String>> =
+        addresses().filter { (label, _) -> !label.startsWith("Tailscale") && (allowWifi || !label.startsWith("Wi-Fi")) }
 
     /** Loopback, private LAN, link-local and Tailscale's 100.64.0.0/10 range. */
     private fun isPrivate(a: InetAddress): Boolean {

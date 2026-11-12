@@ -34,6 +34,7 @@ object Updater {
 
     /** Returns a newer version if the server has one. Throws if the server can't be reached. */
     fun check(context: Context, baseUrl: String): Update? {
+        if (!SELF_UPDATES) return null
         // Some phones can't resolve Tailscale names (e.g. a custom Private DNS bypasses
         // Tailscale's), so fall back to the laptop's Tailscale IP for the default server.
         val candidates = listOf(baseUrl.trimEnd('/')) +
@@ -66,7 +67,7 @@ object Updater {
     /** Quiet background check on app open, at most every few hours. */
     fun checkIfDue(context: Context): Update? {
         val prefs = Prefs(context)
-        if (prefs.updateUrl.isBlank() || System.currentTimeMillis() - prefs.lastUpdateCheck < CHECK_EVERY_MS) return null
+        if (!SELF_UPDATES || prefs.updateUrl.isBlank() || System.currentTimeMillis() - prefs.lastUpdateCheck < CHECK_EVERY_MS) return null
         return runCatching { check(context, prefs.updateUrl) }
             .onFailure { AppLog.i("Update check skipped: server not reachable (${it.javaClass.simpleName})") }
             .getOrNull()

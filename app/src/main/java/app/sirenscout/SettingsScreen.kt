@@ -132,6 +132,7 @@ fun SettingsScreen(onClose: () -> Unit) {
                             OutlinedButton(onClick = { showManual = true }, modifier = Modifier.fillMaxWidth()) { Text("User manual") }
                             OutlinedButton(onClick = { showNotes = true }, modifier = Modifier.fillMaxWidth()) { Text("What's new") }
                             SuggestButtons()
+                            Credits()
                             DiagnosticsButtons()
                         }
                     }
@@ -456,4 +457,16 @@ private fun RfBetaNote() {
             }
         }
     }
+}
+
+@Composable
+private fun Credits() {
+    HorizontalDivider()
+    Text("About", style = MaterialTheme.typography.titleSmall)
+    Text(
+        (if (BuildConfig.AUTHOR.isNotEmpty()) "Siren was created by ${BuildConfig.AUTHOR} and built with Claude, Anthropic's AI assistant."
+        else "Siren was built with Claude, Anthropic's AI assistant.") +
+            " Maps © OpenStreetMap contributors.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
 }

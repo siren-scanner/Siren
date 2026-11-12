@@ -1,0 +1,18 @@
+name: Feature suggestion
+description: Suggest something Siren should do
+labels: [suggestion]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Siren to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why? What would it help with?
+  - type: input
+    id: version
+    attributes:
+      label: Siren version (Settings > Help & diagnostics > What's new)

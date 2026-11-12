@@ -1,0 +1,466 @@
+package app.sirenscout
+
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import android.location.Location
+import android.text.format.DateUtils
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.TileSystem
+import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.MapView
+import org.osmdroid.events.MapEventsReceiver
+import org.osmdroid.views.overlay.CopyrightOverlay
+import org.osmdroid.views.overlay.MapEventsOverlay
+import org.osmdroid.views.overlay.infowindow.InfoWindow
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
+import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.IMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import java.io.File
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
+
+/** Street level: individual buildings and parking spaces. */
+private const val FOCUS_ZOOM = 19.0
+
+/**
+ * OpenStreetMap view with one pin per detection, placed where its signal was strongest. Tapping a
+ * pin shows a card with [onDetails] and [onHide], as tapping and holding a row does in the list.
+ */
+@Composable
+fun DetectionMap(
+    detections: List<Detection>,
+    modifier: Modifier = Modifier,
+    onDetails: (Detection) -> Unit = {},
+    onHide: (Detection) -> Unit = {},
+) {
+    val context = LocalContext.current
+    val markers = remember { mutableMapOf<String, Marker>() }
+    /** The pin whose card is showing, by detection uid. */
+    val selectedState = remember { mutableStateOf<String?>(null) }
+    var selected by selectedState
+    /** Translucent uncertainty circles for estimated locations, by detection uid. */
+    val circles = remember { mutableMapOf<String, Polygon>() }
+    var following by remember { mutableStateOf(true) }
+    var center by remember { mutableStateOf<GeoPoint?>(null) }
+    var zoom by remember { mutableStateOf(15) }
+    val showCameras = remember { Prefs(context).knownCameras }
+    val cameras by KnownCameras.cameras.collectAsStateWithLifecycle()
+    val cameraLayer = remember { CameraLayer() }
+    var hasLocation by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val (mapView, me) = remember {
+        Configuration.getInstance().apply {
+            userAgentValue = context.packageName // required by the OSM tile servers
+            osmdroidBasePath = File(context.cacheDir, "osmdroid")
+            osmdroidTileCache = File(osmdroidBasePath, "tiles")
+        }
+        MapView(context).run {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(true)
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+            controller.setZoom(15.0)
+            val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this)
+            me.enableMyLocation()
+            me.enableFollowLocation()
+            overlays.add(me)
+            overlays.add(CopyrightOverlay(context)) // "© OpenStreetMap contributors", required by OSM
+            // Any tap closes open popups. Returning false lets a tapped pin still open its own.
+            overlays.add(0, MapEventsOverlay(object : MapEventsReceiver {
+                override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
+                    InfoWindow.closeAllInfoWindowsOn(this@run)
+                    selectedState.value = null
+                    return false
+                }
+
+                override fun longPressHelper(p: GeoPoint?) = false
+            }))
+            // Follow mode switches itself off when the map is dragged; mirror that into the UI.
+            addMapListener(object : MapListener {
+                override fun onScroll(event: ScrollEvent?): Boolean {
+                    following = me.isFollowLocationEnabled
+                    center = mapCenter as GeoPoint
+                    return false
+                }
+
+                override fun onZoom(event: ZoomEvent?): Boolean {
+                    zoom = zoomLevelDouble.roundToInt()
+                    return false
+                }
+            })
+            this to me
+        }
+    }
+
+    if (showCameras) {
+        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { KnownCameras.ensureLoaded(context) } }
+        // Load cameras around wherever the map is. Polled rather than keyed on the center, which
+        // changes with every GPS fix while following; already-covered areas return immediately.
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(3_000)
+                val c = center ?: mapView.mapCenter.let { GeoPoint(it.latitude, it.longitude) }
+                // 0,0 is the map's default before any fix - open ocean, nothing to download.
+                if (abs(c.latitude) < 1 && abs(c.longitude) < 1) continue
+                withContext(Dispatchers.IO) { KnownCameras.refreshAround(context, c.latitude, c.longitude) }
+            }
+        }
+    }
+
+    // "Show on map": stop following, zoom to street level on the spot, and open its pin.
+    val focus by MapFocus.pending.collectAsStateWithLifecycle()
+    val focusPin = remember { Marker(mapView) }
+    LaunchedEffect(focus) {
+        val f = focus ?: return@LaunchedEffect
+        me.disableFollowLocation()
+        following = false
+        // After layout and the marker update, so the zoom sticks and the pin exists.
+        mapView.post {
+            val point = GeoPoint(f.lat, f.lon)
+            mapView.mapOrientation = 0f
+            mapView.controller.setZoom(FOCUS_ZOOM)
+            mapView.controller.setCenter(point)
+            org.osmdroid.views.overlay.infowindow.InfoWindow.closeAllInfoWindowsOn(mapView)
+            if (f.uid in markers) {
+                selected = f.uid
+                mapView.invalidate()
+                return@post
+            }
+            val pin = focusPin.apply {
+                // Not in the current list (e.g. filtered out): drop a temporary pin instead.
+                position = point
+                title = f.title
+                snippet = "Strongest signal was here"
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                if (this !in mapView.overlays) mapView.overlays.add(this)
+            }
+            pin.showInfoWindow()
+            mapView.invalidate()
+        }
+        MapFocus.pending.value = null
+    }
+
+    // Your own position marker, recoloured whenever the setting changes.
+    val markerColor by LocationMarker.color.collectAsStateWithLifecycle()
+    LaunchedEffect(markerColor) {
+        me.setDirectionArrow(LocationMarker.dot(context, markerColor), LocationMarker.arrow(context, markerColor))
+        me.setPersonAnchor(0.5f, 0.5f)
+        me.setDirectionAnchor(0.5f, 0.5f)
+        mapView.invalidate()
+    }
+
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            mapView.onDetach()
+        }
+    }
+
+    val located = detections.filter { it.lat != null && it.lon != null }
+    Box(modifier.clipToBounds()) {
+        AndroidView(factory = { mapView }, update = { map ->
+            if (showCameras) cameraLayer.update(map, cameras, zoom)
+            // Update markers in place so an open info window survives new scan results.
+            val keys = located.mapTo(HashSet()) { it.uid }
+            markers.keys.filterNot(keys::contains).forEach { key ->
+                markers.remove(key)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
+            }
+            circles.keys.filterNot(keys::contains).forEach { key -> circles.remove(key)?.let(map.overlays::remove) }
+            for (d in located) {
+                val marker = markers.getOrPut(d.uid) {
+                    Marker(map).apply {
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        icon = ContextCompat.getDrawable(context, org.osmdroid.library.R.drawable.marker_default)
+                            ?.mutate()?.apply { setTint(d.signature?.category.color().toArgb()) }
+                        val uid = d.uid
+                        setOnMarkerClickListener { _, _ ->
+                            InfoWindow.closeAllInfoWindowsOn(map)
+                            selectedState.value = uid
+                            true
+                        }
+                        map.overlays.add(this)
+                    }
+                }
+                // A pin at the estimated location when there is one, else where it was strongest.
+                val est = Detections.estimate(d)
+                marker.position = est?.let { GeoPoint(it.lat, it.lon) } ?: GeoPoint(d.lat!!, d.lon!!)
+                if (est != null) {
+                    val circle = circles.getOrPut(d.uid) {
+                        Polygon(map).apply {
+                            val c = d.signature?.category.color().toArgb()
+                            fillPaint.color = (c and 0x00FFFFFF) or 0x30000000
+                            outlinePaint.color = (c and 0x00FFFFFF) or 0x90000000.toInt()
+                            outlinePaint.strokeWidth = 2f
+                            setOnClickListener { _, _, _ -> false } // taps go to the pin
+                            map.overlays.add(map.overlays.indexOf(marker).coerceAtLeast(0), this)
+                        }
+                    }
+                    circle.points = Polygon.pointsAsCircle(GeoPoint(est.lat, est.lon), est.radiusM)
+                } else {
+                    circles.remove(d.uid)?.let(map.overlays::remove)
+                }
+            }
+            map.invalidate()
+        })
+        if (located.isNotEmpty()) {
+            FilledTonalButton(
+                onClick = {
+                    me.disableFollowLocation()
+                    following = false
+                    mapView.mapOrientation = 0f
+                    val points = located.map { d -> Detections.estimate(d)?.let { GeoPoint(it.lat, it.lon) } ?: GeoPoint(d.lat!!, d.lon!!) }
+                    if (points.size == 1) mapView.controller.animateTo(points[0], 17.0, 600L)
+                    else mapView.zoomToBoundingBox(BoundingBox.fromGeoPoints(points).increaseByScale(1.3f), true)
+                },
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            ) { Text("Show all") }
+        }
+        if (!hasLocation) {
+            // Android 12+ ignores a request for precise location that doesn't also ask for approximate.
+            val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+                val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+                hasLocation = granted
+                if (granted) {
+                    me.enableMyLocation()
+                    me.enableFollowLocation()
+                    following = true
+                }
+            }
+            Card(Modifier.align(Alignment.Center).padding(24.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Location is off for Siren", style = MaterialTheme.typography.titleMedium)
+                    Text("The map needs it to show where you are and the plate readers around you.")
+                    Button(onClick = {
+                        permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                    }) { Text("Allow location") }
+                }
+            }
+        }
+        val chosen = selected?.let { uid -> located.firstOrNull { it.uid == uid } }
+        if (chosen != null) {
+            PinCard(
+                chosen,
+                onDetails = { onDetails(chosen) },
+                onHide = { selected = null; onHide(chosen) },
+                onClose = { selected = null },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
+            )
+        }
+        if (!following && hasLocation && chosen == null) {
+            FilledTonalButton(
+                onClick = {
+                    me.enableFollowLocation()
+                    following = true
+                    if (mapView.zoomLevelDouble < 15.0) mapView.controller.setZoom(16.0)
+                },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+            ) { Text("Follow me") }
+        }
+    }
+}
+
+/** What a tapped pin is, with the same actions as the list: details, and hiding it. */
+@Composable
+private fun PinCard(d: Detection, onDetails: () -> Unit, onHide: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val est = Detections.estimate(d)
+    Card(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 4.dp)) {
+            Text(d.title, style = MaterialTheme.typography.titleMedium)
+            if (d.signature != null && d.name != null) Text(d.name, style = MaterialTheme.typography.bodyMedium)
+            d.guessLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE)) }
+            Text(
+                buildString {
+                    append("${d.source.label} · ${d.id}")
+                    if (d.source != Source.RF) append(" · strongest ${d.bestRssi} dBm")
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "${d.count}× · first ${time(context, d.firstSeen)} · last ${time(context, d.lastSeen)}" +
+                    (est?.let { " · estimated location ±${formatShortDistance(it.radiusM)}" } ?: ""),
+                style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onDetails) { Text("Details") }
+                TextButton(onClick = onHide) { Text("Hide") }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onClose) { Text("Close") }
+            }
+        }
+    }
+}
+
+/** Draws known plate readers: a translucent cone for each direction they face, and a pin. */
+private class CameraLayer {
+    private var shown: List<Camera>? = null
+    private var shownZoom = -1
+    private val overlays = mutableListOf<Overlay>()
+
+    fun update(map: MapView, cameras: List<Camera>, zoom: Int) {
+        if (cameras === shown && zoom == shownZoom) return
+        shown = cameras
+        shownZoom = zoom
+        // Long enough to poke out from under the icon at any zoom, but at least the real reading range.
+        val coneLength = maxOf(
+            CONE_MIN_LENGTH_M,
+            CONE_PIXELS * TileSystem.GroundResolution(map.mapCenter.latitude, zoom.toDouble()),
+        )
+        map.overlays.removeAll(overlays.toSet())
+        overlays.clear()
+        val icon = ContextCompat.getDrawable(map.context, R.drawable.ic_alpr)
+        for (cam in cameras) {
+            if (zoom >= MIN_CONE_ZOOM) for (view in cam.views) overlays += cone(map, cam, view, coneLength)
+        }
+        for (cam in cameras) {
+            overlays += Marker(map).apply {
+                position = GeoPoint(cam.lat, cam.lon)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                this.icon = icon
+                title = cam.label
+                snippet = buildString {
+                    append(
+                        if (cam.views.isEmpty()) "Direction not mapped"
+                        else "Faces " + cam.views.joinToString(", ") { "${it.bearing.roundToInt()}° ${compass(it.bearing)}" }
+                    )
+                    cam.operator?.let { append("<br>Operated by ").append(it) }
+                }
+                subDescription = "OpenStreetMap / DeFlock"
+            }
+        }
+        // Underneath the location dot and detection pins.
+        map.overlays.addAll(0, overlays)
+        map.invalidate()
+    }
+
+    private fun cone(map: MapView, cam: Camera, view: CameraView, length: Double) = Polygon(map).apply {
+        val start = view.bearing - view.width / 2
+        val steps = (view.width / 5).roundToInt().coerceAtLeast(2)
+        points = buildList {
+            add(GeoPoint(cam.lat, cam.lon))
+            for (i in 0..steps) add(offset(cam.lat, cam.lon, length, start + view.width * i / steps))
+            add(GeoPoint(cam.lat, cam.lon))
+        }
+        fillPaint.color = 0x4026A69A
+        outlinePaint.color = 0xA026A69A.toInt()
+        outlinePaint.strokeWidth = 2f
+        setOnClickListener { _, _, _ -> false } // taps go to the pin, not the cone
+    }
+
+    private fun offset(lat: Double, lon: Double, meters: Double, bearing: Float): GeoPoint {
+        val b = Math.toRadians(bearing.toDouble())
+        val dLat = meters * cos(b) / 111_320.0
+        val dLon = meters * sin(b) / (111_320.0 * cos(Math.toRadians(lat)))
+        return GeoPoint(lat + dLat, lon + dLon)
+    }
+
+    companion object {
+        /** Roughly how far a plate reader reads. */
+        private const val CONE_MIN_LENGTH_M = 70.0
+        private const val CONE_PIXELS = 90.0
+        /** Zoomed out further than this, cones are just clutter. */
+        private const val MIN_CONE_ZOOM = 12
+        private val COMPASS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+        fun compass(bearing: Float) = COMPASS[(((bearing + 22.5f) % 360f) / 45f).toInt()]
+    }
+}
+
+private fun time(context: android.content.Context, millis: Long) =
+    DateUtils.formatDateTime(context, millis, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or DateUtils.FORMAT_SHOW_TIME)
+
+/**
+ * Location overlay that, while following, turns the map so the direction of travel points up.
+ * GPS bearing is noise when standing still, so the last heading is kept below walking-ish speed.
+ */
+private class HeadingUpLocationOverlay(provider: IMyLocationProvider, private val map: MapView) :
+    MyLocationNewOverlay(provider, map) {
+    override fun onLocationChanged(location: Location?, source: IMyLocationProvider?) {
+        super.onLocationChanged(location, source)
+        if (location == null || !isFollowLocationEnabled) return
+        if (location.hasBearing() && location.speed >= MIN_HEADING_SPEED_MPS) {
+            map.post { map.mapOrientation = -location.bearing }
+        }
+    }
+
+    companion object {
+        private const val MIN_HEADING_SPEED_MPS = 2.5f // ~5.6 mph
+    }
+}
+
+/** A one-off request for the map to zoom to a detection, e.g. from "Show on map" in its details. */
+object MapFocus {
+    data class Request(val uid: String, val lat: Double, val lon: Double, val title: String)
+
+    val pending = kotlinx.coroutines.flow.MutableStateFlow<Request?>(null)
+
+    fun request(d: Detection) {
+        val lat = d.lat ?: return
+        val lon = d.lon ?: return
+        pending.value = Request(d.uid, lat, lon, d.title)
+    }
+
+    fun request(d: Detection, lat: Double, lon: Double) {
+        pending.value = Request(d.uid, lat, lon, d.title)
+    }
+}

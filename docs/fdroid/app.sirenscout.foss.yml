@@ -1,0 +1,32 @@
+# Draft for F-Droid's fdroiddata repository (metadata/app.sirenscout.foss.yml).
+# Fill in AuthorName, then submit as a merge request - see docs/MAINTAINING.md.
+Categories:
+  - Navigation
+  - Connectivity
+License: GPL-3.0-or-later
+AuthorName: Siren contributors
+SourceCode: https://github.com/siren-scanner/Siren
+IssueTracker: https://github.com/siren-scanner/Siren/issues
+Changelog: https://github.com/siren-scanner/Siren/blob/HEAD/app/src/foss/assets/RELEASE_NOTES.md
+
+AutoName: Siren
+
+RepoType: git
+Repo: https://github.com/siren-scanner/Siren.git
+
+Builds:
+  - versionName: 1.0.41
+    versionCode: 43
+    commit: v1.0.41
+    subdir: app
+    prebuild:
+      # Google libraries are only used by the maintainer's own (non-foss) editions.
+      - sed -i -e '/play-services-location/d' -e '/genai-prompt/d' build.gradle.kts
+      - rm -rf src/google
+    gradle:
+      - foss
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.41
+CurrentVersionCode: 43

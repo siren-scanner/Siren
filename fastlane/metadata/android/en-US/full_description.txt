@@ -1,0 +1,26 @@
+<p>Siren listens for the radio signals that police, fire and EMS equipment gives off, and tells you when some is nearby. It also warns you about plate-reader cameras and unknown trackers traveling with you.</p>
+
+<p>Everything happens on your phone. Siren only listens: it never connects to the devices it hears, and nothing is sent anywhere.</p>
+
+<p><b>What it can detect</b></p>
+<ul>
+<li>Body cameras and their Signal units (which start broadcasting when an officer turns on the lights or siren), police radios, light-bar controllers and EMS equipment, over Bluetooth</li>
+<li>Vehicle Wi-Fi routers used by first-responder fleets</li>
+<li>Flock and Raven plate readers and gunshot detectors, plus mapped plate-reader cameras from OpenStreetMap with the direction they face</li>
+<li>AirTags, Tiles, SmartTags and Find Hub tags that travel with you</li>
+<li>With an optional RTL-SDR dongle: police and fire radio transmissions nearby</li>
+</ul>
+
+<p><b>Features</b></p>
+<ul>
+<li>Alerts with distinct sounds, and an alert when police equipment travels with you</li>
+<li>Map of where things were seen, with estimated locations for parked devices</li>
+<li>History with CSV export, your own watch rules, and hiding your own devices</li>
+<li>A live page for your car's web browser</li>
+<li>Share what one phone has learned with another, by file or automatically</li>
+<li>Built-in user manual</li>
+</ul>
+
+<p>No alert doesn't mean no police: many vehicles carry nothing these scanners can see, and matches are educated guesses. Some places restrict radio scanners in vehicles; check your local laws.</p>
+
+<p>Siren is open source. Suggestions, bug reports and new device signatures are welcome on its project page.</p>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- HTTPS only. Builds that update themselves from a server on the maintainer's Tailscale
+         network replace this file (private/res) to allow plain HTTP to that server, which
+         WireGuard already encrypts. -->
+</network-security-config>

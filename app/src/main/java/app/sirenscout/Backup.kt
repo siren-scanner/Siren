@@ -15,6 +15,13 @@ object Backup {
     private const val FORMAT = 1
     private val PREF_FILES = listOf("settings", "hidden", "watch_rules", "ai_guesses")
 
+    /**
+     * Settings that are secrets or say where Siren connects or updates from. They're left out of
+     * backups and never restored from one, so a backup file someone hands you can't point your
+     * phone's sync, car page or updates at their own device.
+     */
+    internal val PRIVATE_KEYS = setOf("car_code", "sync_code", "sync_serve", "sync_partner", "sync_partner_code", "update_url")
+
     data class Summary(val encounters: Int, val hidden: Int) {
         override fun toString() = "$encounters history encounters, $hidden hidden devices/names and all settings"
     }
@@ -62,6 +69,7 @@ object Backup {
 
     private fun prefsToJson(sp: SharedPreferences) = JSONObject().apply {
         for ((key, value) in sp.all) {
+            if (key in PRIVATE_KEYS) continue
             val typed = when (value) {
                 is Boolean -> JSONObject().put("t", "b").put("v", value)
                 is Int -> JSONObject().put("t", "i").put("v", value)
@@ -76,8 +84,14 @@ object Backup {
     }
 
     private fun jsonToPrefs(json: JSONObject, sp: SharedPreferences) {
+        val kept = sp.all.filterKeys { it in PRIVATE_KEYS }
         val edit = sp.edit().clear()
+        for ((key, value) in kept) when (value) {
+            is Boolean -> edit.putBoolean(key, value)
+            is String -> edit.putString(key, value)
+        }
         for (key in json.keys()) {
+            if (key in PRIVATE_KEYS) continue
             val typed = json.getJSONObject(key)
             when (typed.getString("t")) {
                 "b" -> edit.putBoolean(key, typed.getBoolean("v"))

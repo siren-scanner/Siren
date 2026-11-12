@@ -144,6 +144,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("car_display", false)
         set(v) = sp.edit().putBoolean("car_display", v).apply()
 
+    /** Also serve the car display on Wi-Fi networks the phone has joined, not just its hotspot / USB. */
+    var carOnWifi: Boolean
+        get() = sp.getBoolean("car_on_wifi", false)
+        set(v) = sp.edit().putBoolean("car_on_wifi", v).apply()
+
     /** Secret part of the car display address, so other devices on the hotspot can't open it. */
     var carCode: String
         get() = sp.getString("car_code", null) ?: CarDisplay.newCode().also { carCode = it }

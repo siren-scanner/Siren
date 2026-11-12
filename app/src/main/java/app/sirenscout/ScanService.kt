@@ -120,6 +120,7 @@ class ScanService : Service() {
 
         scope.launch(Dispatchers.IO) { DeviceGuesser.load(this@ScanService) }
         startLocation()
+        CarDisplay.allowWifi = prefs.carOnWifi
         if (prefs.carDisplay) CarDisplay.start(prefs.carCode)
         if (prefs.syncServe) PhoneSync.start(this)
         scope.launch { PhoneSync.loop(this@ScanService) }

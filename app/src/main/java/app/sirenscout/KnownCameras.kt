@@ -70,8 +70,12 @@ object KnownCameras {
             now - it.fetchedAt < MAX_AGE_MS && Odometer.distanceM(it.lat, it.lon, lat, lon) < COVERED_M
         }
         if (covered || now < nextAttemptAt) return@withLock
+        // The map-data servers only learn the area (rounded to 0.1°, about 10 km), not where you are.
+        // Within 15 km of the rounded spot is still at least 10 km inside the 25 km downloaded.
+        val qLat = roundForQuery(lat)
+        val qLon = roundForQuery(lon)
         val fetched = OVERPASS_URLS.firstNotNullOfOrNull { url ->
-            runCatching { fetch(url, lat, lon) }
+            runCatching { fetch(url, qLat, qLon) }
                 .onFailure { AppLog.w("Known camera download from $url failed", it) }
                 .getOrNull()
         }
@@ -80,11 +84,13 @@ object KnownCameras {
             return@withLock
         }
         val merged = (_cameras.value.associateBy { it.id } + fetched.associateBy { it.id }).values.toList()
-        areas = areas.filter { now - it.fetchedAt < MAX_AGE_MS } + Area(lat, lon, now)
+        areas = areas.filter { now - it.fetchedAt < MAX_AGE_MS } + Area(qLat, qLon, now)
         _cameras.value = merged
         save(context)
         AppLog.i("Known cameras: ${fetched.size} downloaded, ${merged.size} cached")
     }
+
+    internal fun roundForQuery(deg: Double) = Math.round(deg * 10) / 10.0
 
     private fun fetch(url: String, lat: Double, lon: Double): List<Camera> {
         val query = """[out:json][timeout:25];node["surveillance:type"="ALPR"](around:$FETCH_RADIUS_M,$lat,$lon);out;"""

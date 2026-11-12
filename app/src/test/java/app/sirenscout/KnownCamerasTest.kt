@@ -49,4 +49,10 @@ class KnownCamerasTest {
         assertEquals(90f, bearingDeg(40.0, -100.0, 40.0, -99.9), 0.5f)
         assertEquals(20f, angleBetween(350f, 10f), 0.001f)
     }
+
+    @Test
+    fun `lookups only reveal the area, rounded to 0_1 degree`() {
+        assertEquals(40.1, KnownCameras.roundForQuery(40.123456), 0.0)
+        assertEquals(-100.1, KnownCameras.roundForQuery(-100.124512), 0.0)
+    }
 }

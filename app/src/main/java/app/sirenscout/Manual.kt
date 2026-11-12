@@ -105,7 +105,7 @@ private fun ManualContent() {
 
     Section("Getting started")
     Bullet("Tap Start. Allow Nearby devices, Location (precise) and Notifications when asked.")
-    Bullet("Siren then asks to turn on Bluetooth and Location, to allow Wi-Fi scanning, and to be exempt from battery optimization - one tap each. Android doesn't let apps switch these on silently. It asks again whenever you return to the app while scanning and something has been switched off.")
+    Bullet("Siren then asks to turn on Bluetooth and Location, to allow Wi-Fi scanning, and to be exempt from battery optimization - one tap each (for Location, some phones open the Location settings page instead; switch it on there and come back). Android doesn't let apps switch these on silently. It asks again whenever you return to the app while scanning and something has been switched off.")
     Bullet("Declined a prompt? It won't ask again until you press Start. To stop it asking about something altogether, turn that switch off under Settings > Scanning > Turn on automatically.")
     Bullet("Wi-Fi itself can stay off: Android's \"Wi-Fi scanning\" option (Location settings) is enough for Siren to see networks.")
     Bullet("The screen stays on while scanning, because Android pauses normal Bluetooth scanning when it's off. A car mount and charger work best. You can turn this off in Settings > Scanning.")
@@ -141,7 +141,7 @@ private fun ManualContent() {
     Section("Alerts")
     Bullet("Each kind of alert has its own sound: a short siren-style yelp for police equipment (nearby or following you), two low beeps for a public-safety radio transmitting nearby, three quick high beeps for an unknown tracker traveling with you, and a rising chime for a plate reader ahead. Other matches (fleet, fire / EMS) are silent unless you turn them on. The same sound won't repeat within 8 seconds.")
     Bullet("Sounds come out of the phone's own speaker, even when it's connected to the car, and music in the car is lowered briefly so you can hear them. To have them play through the car or headphones instead, turn on Play through the car when connected. With the phone on silent they don't play, unless you turn on Play even when the phone is on silent (alarm volume). Change them, or try each one with Test, in Settings > Alerts > Sounds. Alert notifications still vibrate.")
-    Bullet("Teslas broadcast a Bluetooth signal for the phone key, named \"S\", 16 letters and numbers worked out from the car's VIN, and a \"C\". That name pattern is unique to Teslas, so Siren shows these as Tesla car key, without (UNK). Yours will show up in With me on every drive; hold it and hide it by name to clear it. Other Teslas stay visible, since some police departments drive them.")
+    Bullet("Teslas broadcast a Bluetooth signal for the phone key, named \"S\", 16 letters and numbers worked out from the car's VIN, and a \"C\". That name pattern is unique to Teslas, so Siren shows these as Tesla car key, without (UNK). If you drive a Tesla, yours will show up in With me on every drive; hold it and hide it by name to clear it. Other Teslas stay visible, since some police departments drive them.")
     Bullet("The banner at the top turns red while any match has been seen in the last 30 seconds, and shows the strongest one.")
     Bullet("A notification with vibration fires when a match is first seen. The same device alerts again only if it's been 2 minutes since its last alert.")
     Bullet("Signal strength is in dBm: closer to 0 is stronger. As a rough guide, -60 or stronger is very close, -75 close, -88 nearby, weaker is far.")
@@ -212,16 +212,7 @@ private fun ManualContent() {
     Bullet("If a device has a name, the name stays as the title and the guess appears on a line below it.")
     Bullet("Phones and watches change their Bluetooth address every few minutes, so the same phone can appear several times, and some devices can't be guessed at all.")
 
-    Section("On-device AI")
-    Para("Siren can ask Gemini Nano - Google's AI model that runs entirely on the phone, on supported phones like the Pixel 10 - what an unidentified device probably is. Nothing leaves the phone. It's off until you turn on Settings > On-device AI > Use on-device AI.")
-    if (!AiEngine.AVAILABLE_IN_BUILD) {
-        Bullet("This edition (the open-source one, e.g. from F-Droid) doesn't include it: Google's AI model can only be used through a closed-source library. AI guesses shared from another phone with Siren still show.")
-    }
-    Bullet("It only works while Siren is open on screen; Android doesn't allow apps to use it in the background. In your pocket you get the regular guesses.")
-    Bullet("Every 15 seconds it looks at up to 6 devices Siren couldn't match, using their names, makers and what they advertise. Its answer appears on the card and in the details, marked (AI), with a category, a confidence and its reasoning.")
-    Bullet("AI guesses never trigger alerts. A device the AI calls police, fire, fleet or surveillance is highlighted in orange; one it confidently calls consumer gear is treated as everyday.")
-    Bullet("Each kind of device is only asked about once - the answer is remembered, even when the device changes its address. Settings > On-device AI shows the status, lets you download the model the first time, and can forget all AI guesses.")
-    Bullet("Android limits how much AI each app can use per day. If Siren hits that limit it pauses for an hour.")
+    if (AiEngine.AVAILABLE_IN_BUILD) AiSection()
 
     Section("Hiding devices")
     Bullet("Press and hold any card to hide it, tap it and use Hide at the top of its details, or on the map tap its pin and then Hide. Hidden emissions don't appear anywhere, never alert and aren't saved.")
@@ -263,18 +254,18 @@ private fun ManualContent() {
     Bullet("Delete (History tab) permanently erases all saved encounters after you confirm.")
 
     Section("Backing up and moving phones")
-    Bullet("Settings > Backup, sharing & updates > Back up saves your settings, hidden devices, AI identifications and history to one file wherever you choose (Downloads, Google Drive, a USB stick).")
+    Bullet("Settings > Backup, sharing & updates > Back up saves your settings, hidden devices, ${if (AiEngine.AVAILABLE_IN_BUILD) "AI identifications " else ""}and history to one file wherever you choose (Downloads, Google Drive, a USB stick).")
     Bullet("Settings > Backup, sharing & updates > Restore loads a backup: settings and the hidden list are replaced, and history is added to what's already on the phone.")
     Bullet("Uninstalling Siren deletes its data, so back up first. To move to a new phone, back up, send the file over, install Siren there and restore.")
     Bullet("Known camera locations aren't included - they download again by themselves.")
 
-    Section("Updates")
+    Section("Sharing and updates")
     Bullet("Share data passes what one phone has learned to another: AI identifications, hidden devices and names, watch rules, and history if you tick it. It goes through Android's share menu (Quick Share, Bluetooth, a message). On the other phone, open Settings > Backup, sharing & updates > Add shared data and pick the file (Quick Share puts it in Downloads).")
-    Bullet("Adding shared data only adds: nothing on the receiving phone is removed or replaced, and its settings stay as they are. AI identifications work on any phone, so a phone that can't run the AI itself still shows the (AI) guesses another phone made.")
+    Bullet("Adding shared data only adds: nothing on the receiving phone is removed or replaced, and its settings stay as they are. AI identifications made by an edition of Siren with on-device AI show on any phone, even one that can't run the AI itself.")
     Bullet("History includes where things were seen, which shows where you've been. It's off unless you tick it.")
     Bullet("To sync automatically instead, use Tailscale, a free private network between your own devices (install the Tailscale app on each phone). On one phone, turn on Settings > Backup, sharing & updates > Let my other phones sync with this one; it shows its address and a code. On the other phone, enter them under Sync with another phone. From then on, every 10 minutes while both are scanning, the second phone sends its data to the first and adds the first one's. Sync now does it right away, and the line under it shows how the last sync went.")
     Bullet("Syncing, like Add shared data, only adds. Un-hiding a device on one phone doesn't un-hide it on the other. Only devices on your Tailscale network that know the code can connect; New code locks out a phone you've stopped using. History is only synced if Include history is on.")
-    Bullet("To give Siren to someone else, tap Settings > Backup, sharing & updates > Share Siren. It sends the copy installed on your phone through Android's share menu (Quick Share, Bluetooth, a messaging app). They open the file to install it, allowing installs from that app when Android asks. Their copy won't update itself unless you share your laptop with them in Tailscale.")
+    Bullet("To give Siren to someone else, tap Settings > Backup, sharing & updates > Share Siren. It sends the copy installed on your phone through Android's share menu (Quick Share, Bluetooth, a messaging app). They open the file to install it, allowing installs from that app when Android asks. ${if (SELF_UPDATES) "Their copy won't update itself unless you share your laptop with them in Tailscale." else "Their copy won't update itself; installing Siren from F-Droid instead keeps it up to date."}")
     Bullet("Settings > Help & diagnostics > What's new lists what changed in every version, newest first.")
     Bullet("Siren is open source. Settings > Help & diagnostics > Suggest a feature or report a problem opens its project page, where you can suggest features, report bugs or propose new device signatures. Anyone may change Siren for their own needs and share their version under the same license (GPL-3.0).")
     if (SELF_UPDATES) {
@@ -288,7 +279,7 @@ private fun ManualContent() {
     }
 
     Section("Crash reports and diagnostics")
-    Bullet("If Siren crashes, it saves a report on the phone. Next time you open it, you're offered Share report, which opens Android's share menu so you can send it however you like.")
+    Bullet("If Siren crashes, it saves a report on the phone. Next time you open it, you're offered Share report, which opens Android's share menu so you can send it however you like - for example attached to a bug report (Settings > Help & diagnostics > Suggest a feature or report a problem).")
     Bullet("While scanning, Settings > Help & diagnostics shows live scan health: Bluetooth broadcasts heard in the last minute, devices found by classic Bluetooth, how long ago Wi-Fi results last arrived, and any scan failures. Zero Bluetooth broadcasts or stale Wi-Fi results come with a hint about what to check.")
     Bullet("Settings > Help & diagnostics > Share last crash sends the newest report again. Share activity log sends a record of what the app has been doing (scanners starting and stopping, download failures, declined prompts) - useful when something isn't working but nothing crashed.")
     Bullet("Reports include the app version, Android version and phone model. They don't include locations or history, and any device address in them is cut to its maker part (00:25:DF:••:••:••).")
@@ -311,10 +302,10 @@ private fun ManualContent() {
     Bullet("Tuner gain: raise it if nothing ever registers, lower it if everything does.")
     Bullet("To use a receiver elsewhere (e.g. a Raspberry Pi in the car running rtl_tcp), change the host and port.")
 
-    Section("Car display (test)")
+    Section("Car display (experimental)")
     Para("Siren can show a live page in another screen's web browser - for example a Tesla's - with the alert banner, matches with signal strength, scanner status and the latest alert.")
     Bullet("Turn it on in Settings > Car display, then press Start.")
-    Bullet("Connect the car to the phone: turn on the phone's hotspot and join it from the car's Wi-Fi settings. Or plug the phone in and turn on USB tethering (Settings > Network & internet > Hotspot & tethering) - whether the car accepts that is still being tested.")
+    Bullet("Connect the car to the phone: turn on the phone's hotspot and join it from the car's Wi-Fi settings. Or plug the phone in and turn on USB tethering (Settings > Network & internet > Hotspot & tethering), if your car accepts it.")
     Bullet("Settings > Car display lists the phone's addresses for each connection. Type the one for the connection you're using into the car's browser, for example http://192.168.43.1:8080/abc234.")
     Bullet("The page updates every second. Tap Enable sound on it once to get a beep with each new alert (browsers only allow sound after a tap).")
     Bullet("The last part of the address is a secret code, so other devices on your hotspot can't open the page. New code changes it. The page only answers devices on local or private networks.")
@@ -326,11 +317,11 @@ private fun ManualContent() {
     Bullet("On battery: the screen may sleep and Bluetooth scans at a balanced rate. The targeted screen-off scan keeps watching for Flock and Raven IDs. Plugging in or unplugging changes the screen within seconds and the Bluetooth scan speed within 10 minutes.")
     Bullet("Wi-Fi: as fast as Android allows (see Fast Wi-Fi above).")
     Bullet("Plate-reader alerts: timed to give about 15 seconds of warning at your current speed - closer in town, further out on the highway.")
-    Bullet("RF monitoring: on only when an RTL-SDR dongle is plugged in (or a remote rtl_tcp host is set) and you've entered frequencies.")
+    Bullet("RF monitoring: on whenever an RTL-SDR dongle is plugged in (or a remote rtl_tcp host is set).")
     Bullet("While it's on, the controls it manages are greyed out and show its choice. Turn it off to use your own settings, which are kept.")
 
     Section("Settings reference")
-    Bullet("Settings opens a menu of sections: Alerts, Plate readers, Scanning, Map, Radio, Watch rules & hidden, Car display, Backup sharing & updates, and Help & diagnostics. Tap one to open it; the back arrow (or your phone's back gesture) returns to the menu, and Done closes Settings.")
+    Bullet("Settings opens a menu of sections: Alerts, Plate readers, Scanning, Map, Radio, Watch rules & hidden, Car display, Backup sharing & updates, ${if (AiEngine.AVAILABLE_IN_BUILD) "On-device AI, " else ""}and Help & diagnostics. Tap one to open it; the back arrow (or your phone's back gesture) returns to the menu, and Done closes Settings.")
     Bullet("Turn on automatically (Bluetooth, Location, Wi-Fi scanning, battery optimization) - all on by default; changes apply from the next prompt.")
     Bullet("Scanning: fast Wi-Fi scans, targeted screen-off scan and keep screen on - all on by default. Fast Wi-Fi and the targeted scan take effect right away; keep screen on applies the next time you press Start.")
     Bullet("Alert signal strength, RF options and the traveling-with-you time and distance apply the next time you press Start.")
@@ -344,8 +335,19 @@ private fun ManualContent() {
     Bullet("Some places restrict scanners in vehicles. Check your local laws before using RF monitoring while driving.")
 }
 
+@Composable
+private fun AiSection() {
+    Section("On-device AI")
+    Para("Siren can ask Gemini Nano - Google's AI model that runs entirely on the phone, on supported phones like the Pixel 10 - what an unidentified device probably is. Nothing leaves the phone. It's off until you turn on Settings > On-device AI > Use on-device AI.")
+    Bullet("It only works while Siren is open on screen; Android doesn't allow apps to use it in the background. In your pocket you get the regular guesses.")
+    Bullet("Every 15 seconds it looks at up to 6 devices Siren couldn't match, using their names, makers and what they advertise. Its answer appears on the card and in the details, marked (AI), with a category, a confidence and its reasoning.")
+    Bullet("AI guesses never trigger alerts. A device the AI calls police, fire, fleet or surveillance is highlighted in orange; one it confidently calls consumer gear is treated as everyday.")
+    Bullet("Each kind of device is only asked about once - the answer is remembered, even when the device changes its address. Settings > On-device AI shows the status, lets you download the model the first time, and can forget all AI guesses.")
+    Bullet("Android limits how much AI each app can use per day. If Siren hits that limit it pauses for an hour.")
+}
+
 /** Tab label for each section, in the order they appear. Titles must match the Section() calls. */
-private val TOPICS = listOf(
+private val TOPICS = listOfNotNull(
     "What Siren does" to "About",
     "Getting started" to "Start",
     "What it detects" to "Detects",
@@ -357,16 +359,16 @@ private val TOPICS = listOf(
     "Details and finding a device" to "Finder",
     "Your own watch rules" to "Watch",
     "Device guesses (UNK)" to "Guesses",
-    "On-device AI" to "AI",
+    if (AiEngine.AVAILABLE_IN_BUILD) "On-device AI" to "AI" else null,
     "Hiding devices" to "Hiding",
     "Map" to "Map",
     "Known plate-reader cameras" to "Cameras",
     "History and export" to "History",
     "Backing up and moving phones" to "Backup",
-    "Updates" to "Updates",
+    "Sharing and updates" to "Sharing",
     "Crash reports and diagnostics" to "Diagnostics",
     "RF monitoring (optional)" to "RF",
-    "Car display (test)" to "Car",
+    "Car display (experimental)" to "Car",
     "Auto-optimize" to "Auto",
     "Settings reference" to "Settings",
     "Limits and tips" to "Tips",

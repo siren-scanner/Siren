@@ -80,6 +80,10 @@ Overpass API.
 
 ## Credits
 
+Siren was created by [siren-scanner](https://github.com/siren-scanner) and built with
+[Claude](https://claude.ai), Anthropic's AI assistant: the creator directed and tested it, and
+Claude wrote the code. Contributions from anyone are welcome.
+
 - Maps © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, shown with
   [osmdroid](https://github.com/osmdroid/osmdroid). Plate-reader locations from OpenStreetMap,
   mapped largely by the [DeFlock](https://deflock.me) community.
@@ -87,5 +91,5 @@ Overpass API.
 
 ## License
 
-Copyright © 2026 the Siren contributors. Licensed under the
+Copyright © 2026 siren-scanner and the Siren contributors. Licensed under the
 [GNU General Public License v3.0 or later](LICENSE).

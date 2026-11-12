@@ -1,10 +1,10 @@
 # Draft for F-Droid's fdroiddata repository (metadata/app.sirenscout.foss.yml).
-# Fill in AuthorName, then submit as a merge request - see docs/MAINTAINING.md.
+# Submit as a merge request - see docs/MAINTAINING.md.
 Categories:
   - Navigation
   - Connectivity
 License: GPL-3.0-or-later
-AuthorName: Siren contributors
+AuthorName: siren-scanner
 SourceCode: https://github.com/siren-scanner/Siren
 IssueTracker: https://github.com/siren-scanner/Siren/issues
 Changelog: https://github.com/siren-scanner/Siren/blob/HEAD/app/src/foss/assets/RELEASE_NOTES.md

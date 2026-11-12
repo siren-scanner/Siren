@@ -26,6 +26,7 @@ android {
         "\"" + (local.getProperty(key)?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }?.let { it + suffix } ?: "") + "\""
     // Where people send suggestions and find the code (gradle.properties: siren.repoUrl).
     val repoUrl = (project.findProperty("siren.repoUrl") as String?).orEmpty()
+    val author = (project.findProperty("siren.author") as String?).orEmpty()
 
     // The release key lives outside the project (~/.android) so it never gets shared with the code.
     val keystoreProps = File(System.getProperty("user.home"), ".android/sirenscout-keystore.properties")
@@ -57,6 +58,7 @@ android {
     flavorDimensions += "channel"
     defaultConfig {
         buildConfigField("String", "REPO_URL", "\"$repoUrl\"")
+        buildConfigField("String", "AUTHOR", "\"$author\"")
     }
     productFlavors {
         create("stable") {

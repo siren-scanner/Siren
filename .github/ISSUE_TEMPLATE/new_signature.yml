@@ -1,0 +1,29 @@
+name: New device signature
+description: Equipment Siren should recognize
+labels: [signature]
+body:
+  - type: input
+    id: device
+    attributes:
+      label: What is the device? (e.g. "Axon Fleet 3 camera", "Whelen light-bar controller")
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options: [Police, Fire / EMS, Fleet, Surveillance (plate readers etc.), Other]
+    validations:
+      required: true
+  - type: textarea
+    id: seen
+    attributes:
+      label: What Siren showed for it
+      description: From All nearby or the device's details - name, maker, radio (BLE / Bluetooth / Wi-Fi) and the first half of the address (e.g. 00:25:DF). Please leave out anything that identifies a person.
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How do you know what it is?
+      description: e.g. seen on a marked vehicle, a manual, an FCC filing.

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Burnt orange instead of navy, so Siren Test is easy to tell from Siren on the home screen. -->
+    <color name="launcher_bg">#FF8A3B00</color>
+</resources>

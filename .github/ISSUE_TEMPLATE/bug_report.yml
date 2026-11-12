@@ -1,0 +1,28 @@
+name: Bug report
+description: Something doesn't work
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen again?
+  - type: input
+    id: version
+    attributes:
+      label: Siren version
+  - type: input
+    id: phone
+    attributes:
+      label: Phone and Android version
+  - type: textarea
+    id: log
+    attributes:
+      label: Activity log or crash report
+      description: Settings > Help & diagnostics > Share activity log (or Share last crash). Device addresses are already shortened.
+      render: text

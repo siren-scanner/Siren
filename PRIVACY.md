@@ -1,0 +1,26 @@
+# Privacy
+
+Siren has no accounts, analytics, ads or tracking, and no server of its own.
+
+**What stays on your phone:** everything Siren detects, your history (including where things were
+seen), hidden devices, watch rules, settings, crash reports and the activity log. Uninstalling
+Siren deletes all of it.
+
+**What goes over the network:**
+- **Map tiles** from OpenStreetMap's tile servers, for the area you're looking at.
+- **Plate-reader locations** from OpenStreetMap's Overpass API, for the area around you.
+- Only if you turn them on yourself:
+  - **Car display:** a web page served by your phone to devices on the same local network
+    (your car on the phone's hotspot, for example), protected by a code.
+  - **Phone sync:** your phones exchange AI identifications, hidden devices, watch rules and,
+    if you choose, history, directly with each other over your own Tailscale network.
+  - **Radio monitoring:** a connection to the RTL-SDR driver on the phone, or to an `rtl_tcp`
+    receiver you name.
+
+**What you choose to share:** backups, shared-data files, CSV exports, crash reports and the
+activity log only leave the phone when you send them. Safe export, crash reports and the activity
+log leave out or shorten device addresses and exact locations.
+
+**Permissions:** Bluetooth and Wi-Fi scanning (to hear devices), location (Android requires it for
+scan results, and for the map and history), notifications (alerts), and running in the background
+while scanning.

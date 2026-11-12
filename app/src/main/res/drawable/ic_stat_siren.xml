@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar version of the lyre: white only, heavier lines and one wave per side so it
+     stays readable at 24dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="72" android:viewportHeight="72">
+    <group android:translateX="-18" android:translateY="-18">
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="6.5" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M45,78 C37,70 35,52 41,42 C43,38 42,32 37,31 M63,78 C71,70 73,52 67,42 C65,38 66,32 71,31 M44,78 L64,78 M41,44 L67,44" />
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="3.2"
+            android:pathData="M50.5,44 L50.5,78 M57.5,44 L57.5,78" />
+        <path android:strokeColor="#FFFFFFFF" android:strokeWidth="5" android:strokeLineCap="round"
+            android:pathData="M30.2,47 A26,26 0 0,0 30.2,71 M77.8,47 A26,26 0 0,1 77.8,71" />
+    </group>
+</vector>

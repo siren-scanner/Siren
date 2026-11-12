@@ -1,0 +1,726 @@
+FEFF	GN Netcom
+FEFE	GN Hearing
+FEFD	Gimbal
+FEFC	Gimbal
+FEFB	Telit Wireless Solutions (Formerly Stoll
+FEFA	PayPal
+FEF9	PayPal
+FEF8	Aplix
+FEF7	Aplix
+FEF6	Wicentric
+FEF5	Dialog Semiconductor
+FEF4	Google
+FEF3	Google
+FEF2	CSR
+FEF1	CSR
+FEF0	Intel
+FEEF	Polar Electro
+FEEE	Polar Electro
+FEED	Tile
+FEEC	Tile
+FEEB	Swirl Networks
+FEEA	Swirl Networks
+FEE9	Quintic
+FEE8	Quintic
+FEE7	Tencent Holdings
+FEE6	Silvair
+FEE5	Nordic Semiconductor
+FEE4	Nordic Semiconductor
+FEE3	Anki
+FEE2	Anki
+FEE1	Anhui Huami Information
+FEE0	Anhui Huami Information
+FEDE	Coin
+FEDD	Jawbone
+FEDC	Jawbone
+FEDB	Perka
+FEDA	ISSC
+FED9	Pebble
+FED8	Google
+FED7	Broadcom
+FED6	Broadcom
+FED5	Plantronics
+FED4	Apple
+FED3	Apple
+FED2	Apple
+FED1	Apple
+FED0	Apple
+FECF	Apple
+FECE	Apple
+FECD	Apple
+FECC	Apple
+FECB	Apple
+FECA	Apple
+FEC9	Apple
+FEC8	Apple
+FEC7	Apple
+FEC6	Kocomojo
+FEC5	Realtek Semiconductor
+FEC4	PLUS Location Systems
+FEC3	360fly
+FEC2	Blue Spark
+FEC1	KDDI
+FEC0	KDDI
+FEBF	Nod
+FEBE	Bose
+FEBD	Clover Network
+FEBC	Dexcom
+FEBB	adafruit industries
+FEBA	Tencent Holdings
+FEB9	LG Electronics
+FEB8	Meta Platforms
+FEB7	Meta Platforms
+FEB6	Vencer
+FEB5	WiSilica
+FEB4	WiSilica
+FEB3	Taobao
+FEB2	Microsoft
+FEB1	Electronics Tomorrow
+FEB0	Nest Labs
+FEAF	Nest Labs
+FEAE	Nokia
+FEAD	Nokia
+FEAC	Nokia
+FEAB	Nokia
+FEAA	Google
+FEA9	Savant Systems
+FEA8	Savant Systems
+FEA7	UTC Fire and Security
+FEA6	GoPro
+FEA5	GoPro
+FEA4	Paxton Access
+FEA3	ITT Industries
+FEA0	Google
+FE9F	Google
+FE9E	Renesas Design Netherlands
+FE9D	Mobiquity Networks
+FE9C	GSI Laboratories
+FE9B	Samsara Networks
+FE9A	Estimote
+FE99	Currant
+FE98	Currant
+FE97	Tesla Motors
+FE96	Tesla Motors
+FE95	Xiaomi
+FE94	OttoQ In
+FE93	OttoQ In
+FE92	Jarden Safety & Security
+FE91	Shanghai Imilab,Ltd
+FE90	JUMA
+FE8F	CSR
+FE8E	ARM
+FE8D	Interaxon
+FE8C	TRON Forum
+FE8B	Apple
+FE8A	Apple
+FE89	B&O Play
+FE88	SALTO SYSTEMS S.L
+FE87	Qingdao Yeelink Information ( 青岛亿联客信息技术有
+FE86	HUAWEI
+FE85	RF Digital
+FE84	RF Digital
+FE83	Blue Bite
+FE82	Medtronic
+FE81	Medtronic
+FE80	Doppler Lab
+FE7F	Doppler Lab
+FE7E	Awear Solutions
+FE7D	Aterica Health
+FE7C	Telit Wireless Solutions (Formerly Stoll
+FE7B	Orion Labs
+FE7A	Bragi
+FE79	Zebra
+FE78	Hewlett-Packard
+FE77	Hewlett-Packard
+FE76	TangoMe
+FE75	TangoMe
+FE74	unwire
+FE73	Abbott Medical (formerly St. Jude Medica
+FE72	Abbott Medical (formerly St. Jude Medica
+FE71	Plume Design
+FE70	Beijing Jingdong Century Trading
+FE6F	LINE
+FE6E	The University of Tokyo
+FE6D	The University of Tokyo
+FE6C	TASER International
+FE6B	TASER International
+FE6A	Kontakt Micro-Location Sp. z o.o
+FE69	Capsle
+FE68	Capsle
+FE67	Lab Sensor Solutions
+FE66	Intel
+FE65	CHIPOLO d.o.o
+FE64	Siemens
+FE63	Connected Yard
+FE62	Indagem Tech
+FE61	Logitech International
+FE60	Lierda Science & Group
+FE5F	Eyefi
+FE5E	Plastc
+FE5D	Grundfos
+FE5C	million hunters
+FE5B	GT-tronics HK
+FE5A	Cronologics
+FE59	Nordic Semiconductor
+FE58	Nordic Semiconductor
+FE57	Dotted Labs
+FE56	Google
+FE55	Google
+FE54	Motiv
+FE53	3M
+FE52	SetPoint Medical
+FE51	SRAM
+FE50	Google
+FE4F	Molekule
+FE4E	NTT docomo
+FE4D	Casambi
+FE4C	Volkswagen
+FE4B	Signify Netherlands (formerly Philips Li
+FE4A	OMRON HEALTHCARE
+FE49	SenionLab
+FE48	General Motors
+FE47	General Motors
+FE46	B&O Play
+FE45	Snapchat
+FE44	SK Telecom
+FE43	Andreas Stihl
+FE42	Nets
+FE41	Inugo Systems
+FE40	Inugo Systems
+FE3F	Friday Labs
+FE3E	BD Medical
+FE3D	BD Medical
+FE3C	alibaba
+FE3B	Dolby Laboratories
+FE3A	TTS Tooltechnic Systems
+FE39	TTS Tooltechnic Systems
+FE36	HUAWEI
+FE35	HUAWEI
+FE34	SmallLoop
+FE33	CHIPOLO d.o.o
+FE32	Pro-Mark
+FE31	Volkswagen
+FE30	Volkswagen
+FE2F	CRESCO Wireless
+FE2E	ERi,Inc
+FE2D	LAMPLIGHT
+FE2C	Google
+FE2B	ITT Industries
+FE2A	DaisyWorks
+FE29	Gibson Innovations
+FE28	Ayla Networks
+FE27	Google
+FE26	Google
+FE25	Apple
+FE24	August Home
+FE23	Zoll Medical
+FE22	Zoll Medical
+FE21	Bose
+FE20	Emerson
+FE1F	Garmin International
+FE1E	LAMPLIGHT
+FE1D	Illuminati Instrument
+FE1C	NetMedia
+FE1B	Tyto Life
+FE1A	Tyto Life
+FE19	Google
+FE18	Runtime
+FE17	Telit Wireless Solutions
+FE16	Footmarks
+FE15	Amazon.com Services
+FE14	Flextronics International USA
+FE13	Apple
+FE12	M-Way Solutions
+FE11	GMC-I Messtechnik
+FE10	LAPIS
+FE0F	Signify Netherlands (formerly Philips Li
+FE0E	Setec
+FE0D	Procter & Gamble
+FE0C	Procter & Gamble
+FE0B	ruwido austria
+FE0A	ruwido austria
+FE09	Pillsy
+FE08	Microsoft
+FE07	Sonos
+FE06	Qualcomm
+FE05	CORE Transport NZ
+FE04	Motorola Solutions
+FE03	Amazon.com Services
+FE02	Robert Bosch
+FE01	Duracell U.S. Operations
+FE00	Amazon.com Services
+FDFF	OSRAM
+FDFE	ADHERIUM(NZ)
+FDFD	RecursiveSoft
+FDFC	Optrel
+FDFB	Tandem Diabetes Care
+FDFA	Tandem Diabetes Care
+FDF9	INIA
+FDF8	Onvocal
+FDF7	HP
+FDF6	AIAIAI ApS
+FDF5	Milwaukee Electric Tools
+FDF4	O. E. M. Controls
+FDF3	Amersports
+FDF2	AMICCOM Electronics
+FDF1	LAMPLIGHT,Ltd
+FDF0	Google
+FDEF	ART AND PROGRAM
+FDEE	Huawei
+FDED	Pole Star
+FDEC	Mannkind
+FDEB	Syntronix
+FDEA	SeeScan
+FDE9	Spacesaver
+FDE8	Robert Bosch
+FDE7	SECOM
+FDE6	Intelletto
+FDE5	SMK
+FDE4	JUUL Labs
+FDE3	Abbott Diabetes Care
+FDE2	Google
+FDE1	Fortin Electronic Systems
+FDE0	John Deere
+FDDF	Harman International
+FDDE	Noodle
+FDDD	Arch Systems
+FDDC	4iiii Innovations
+FDDB	Samsung Electronics
+FDDA	MHCS
+FDD9	Jiangsu Teranovo Tech
+FDD8	Jiangsu Teranovo Tech
+FDD7	Copeland Cold Chain LP
+FDD6	Ministry of Supply
+FDD5	Brompton Bicycle
+FDD4	LX Solutions
+FDD3	FUBA Automotive Electronics
+FDD2	Bose
+FDD1	Huawei
+FDD0	Huawei
+FDCF	Nalu Medical
+FDCE	SENNHEISER electronic
+FDCD	Qingping (Beijing)
+FDCC	Shoof
+FDCB	Meggitt
+FDCA	Fortin Electronic Systems
+FDC9	Busch-Jaeger Elektro
+FDC8	Hach – Danaher
+FDC7	Eli Lilly and
+FDC6	Eli Lilly and
+FDC5	Automatic Labs
+FDC4	Simavita (Aust)
+FDC3	Baidu Online Network (Beijing)
+FDC2	Baidu Online Network (Beijing)
+FDC1	Hunter Douglas
+FDC0	Hunter Douglas
+FDBF	California Things
+FDBE	California Things
+FDBD	Clover Network
+FDBC	Emerson
+FDBB	Profoto
+FDB8	LivaNova USA
+FDB7	LivaNova USA
+FDB6	GWA Hygiene
+FDB5	ECSG
+FDB4	HP
+FDB3	Audiodo
+FDB2	Portable Multimedia
+FDB1	Oura Health
+FDB0	Oura Health
+FDAF	Wiliot
+FDAE	Houwa System Design, k.k
+FDAD	Houwa System Design, k.k
+FDAC	Tentacle Sync
+FDAB	Xiaomi
+FDAA	Xiaomi
+FDA9	Rhombus Systems
+FDA8	PSA Peugeot Citroën
+FDA7	WWZN Information
+FDA6	WWZN Information
+FDA5	Neurostim OAB
+FDA4	Inseego
+FDA3	Inseego
+FDA2	Groove X
+FDA1	Groove X
+FDA0	Secugen
+FD9F	VitalTech Affiliates
+FD9E	The Coca-Cola
+FD9D	Gastec
+FD9C	Huawei
+FD9B	Huawei
+FD9A	Huawei
+FD99	ABB
+FD98	Disney Worldwide Services
+FD97	June Life
+FD96	Google
+FD95	Rigado
+FD94	Hewlett Packard Enterprise
+FD93	Bayerische Motoren Werke
+FD92	Qualcomm International (QTIL)
+FD91	Groove X
+FD90	Guangzhou SuperSound Information,Ltd
+FD8E	Motorola Solutions
+FD8D	quip NYC
+FD8C	Google
+FD8B	Jigowatts
+FD8A	Signify Netherlands
+FD89	Urbanminded
+FD88	Urbanminded
+FD87	Google
+FD86	Abbott
+FD85	Husqvarna
+FD84	Tile
+FD83	iNFORM
+FD82	Sony
+FD81	CANDY HOUSE
+FD80	Phindex
+FD7F	Husqvarna
+FD7E	Samsung Electronics
+FD7D	Center for Advanced Research Wernher Von
+FD7C	Toshiba Information Systems(Japan)
+FD7B	WYZE LABS
+FD7A	Withings
+FD79	Withings
+FD78	Withings
+FD77	Withings
+FD76	Insulet
+FD75	Insulet
+FD74	BRControls Products
+FD73	BRControls Products
+FD72	Logitech International
+FD71	GN Hearing
+FD70	GuangDong Oppo Mobile Telecommunications
+FD6F	Apple
+FD6E	Polidea sp. z o.o
+FD6D	Sigma Elektro
+FD6C	Samsung Electronics
+FD6B	rapitag
+FD6A	Emerson
+FD69	Samsung Electronics
+FD68	Ubique Innovation
+FD67	Montblanc Simplo
+FD66	Zebra
+FD65	Razer
+FD64	INRIA
+FD63	Google
+FD62	Google
+FD61	Arendi
+FD60	Sercomm
+FD5F	Meta Platforms
+FD5E	Tapkey
+FD5D	maxon motor
+FD5C	React Mobile
+FD5B	V2SOFT
+FD5A	Samsung Electronics
+FD59	Samsung Electronics
+FD58	Volvo Car
+FD57	Volvo Car
+FD56	Resmed
+FD55	Braveheart Wireless
+FD54	Qingdao Haier
+FD53	PCI Private
+FD52	UTC Fire and Security
+FD51	UTC Fire and Security
+FD50	Hangzhou Tuya Information
+FD4F	SONITOR
+FD4E	70mai,Ltd
+FD4D	70mai,Ltd
+FD4C	Adolf Wuerth
+FD4B	Samsung Electronics
+FD4A	Sigma Elektro
+FD49	Panasonic
+FD48	Geberit International
+FD47	Liberty Global
+FD46	Lemco IKE
+FD45	GB Solution,Ltd
+FD44	Apple
+FD43	Apple
+FD42	Globe (Jiangsu),Ltd
+FD41	Amazon Lab126
+FD40	Beflex
+FD3F	Cognosos
+FD3E	Pure Watercraft
+FD3D	Woan (Shenzhen)
+FD3C	Redline Communications
+FD3B	Verkada
+FD3A	Verkada
+FD39	PREDIKTAS
+FD38	Danfoss
+FD37	TireCheck
+FD36	Google
+FD35	Transsion Holdings
+FD34	Aerosens
+FD33	DashLogic
+FD32	Gemalto Holding
+FD31	LG Electronics
+FD30	Sesam Solutions
+FD2F	Bitstrata Systems
+FD2E	Bitstrata Systems
+FD2D	Xiaomi
+FD2C	The Access
+FD2B	The Access
+FD2A	Sony
+FD29	Asahi Kasei
+FD28	Julius Blum
+FD27	Integrated Illumination Systems
+FD26	Novo Nordisk
+FD25	GD Midea Air-Conditioning Equipment
+FD24	GD Midea Air-Conditioning Equipment
+FD23	DOM Sicherheitstechnik
+FD22	Huawei
+FD21	Huawei
+FD20	GN Hearing
+FD1F	3M
+FD1E	Plume Design
+FD1D	Samsung Electronics
+FD1C	Brady Worldwide
+FD1B	Helios Sports
+FD1A	CSIRO
+FD19	Smith & Nephew Medical
+FD18	LEGIC Identsystems
+FD17	LEGIC Identsystems
+FD16	Sensitech
+FD15	Panasonic
+FD14	BRG Sports
+FD13	BRG Sports
+FD12	AEON MOTOR,LTD
+FD11	AEON MOTOR,LTD
+FD10	AEON MOTOR,LTD
+FD0F	AEON MOTOR,LTD
+FD0E	HerdDogg
+FD0D	Blecon
+FD0C	OSM HK
+FD0B	Luminostics
+FD0A	Luminostics
+FD09	Cousins and Sears
+FD08	Bull Group
+FD07	Swedlock
+FD06	RACE-AI
+FD05	Qualcomm
+FD04	Shure
+FD03	Quuppa
+FD02	LEGO System
+FD01	Sanvita Medical
+FD00	FUTEK Advanced Sensor
+FCFF	701x
+FCFE	Sonova Consumer Hearing
+FCFD	Barrot,Ltd
+FCFC	Barrot,Ltd
+FCFB	Shenzhen Benwei Media
+FCFA	Leupold & Stevens
+FCF9	Leupold & Stevens
+FCF8	Honor Device
+FCF7	Honor Device
+FCF6	The Linux Foundation
+FCF5	Trident Communication
+FCF4	Allegion
+FCF3	Armatura
+FCF2	Bitwards
+FCF1	Google
+FCF0	Security Enhancement Systems
+FCEF	Divesoft s.r.o
+FCEE	Velentium
+FCED	Workaround
+FCEC	Griffwerk
+FCEB	Avi-On
+FCEA	Chess Wise
+FCE9	MindRhythm
+FCE8	ITT Industries
+FCE7	TKH Security
+FCE6	Guard RFID Solutions
+FCE5	Samsara Networks
+FCE4	Samsara Networks
+FCE3	Smith & Nephew Medical
+FCE2	Baracoda Daily Healthtech
+FCE1	Sony Group
+FCE0	Akciju sabiedriba \"SAF TEHNIKA\
+FCDF	NIO USA
+FCDE	ARCTOP
+FCDD	Mobilaris
+FCDC	Amazon.com Services
+FCDB	aconno
+FCDA	Draeger
+FCD9	Huso
+FCD8	Appex Factory S.L
+FCD7	PowerPal
+FCD6	SWISSINNO SOLUTIONS
+FCD5	Nortek Security & Control
+FCD4	OMRON HEALTHCARE
+FCD3	Fisher & Paykel Healthcare
+FCD2	Allterco Robotics
+FCD1	Shenzhen Benwei Media,Ltd
+FCD0	Laerdal Medical
+FCCF	Google
+FCCE	Luna Health
+FCCD	Marshall Group
+FCCB	TOTO
+FCCA	Cosmed s.r.l
+FCC9	SkyHawke
+FCC8	Allthenticate
+FCC7	PB
+FCC6	Wiliot
+FCC5	OMRON(DALIAN),.LTD
+FCC4	OMRON(DALIAN),.LTD
+FCC3	HP
+FCC2	Qualcomm
+FCC1	TIMECODE SYSTEMS
+FCC0	Xiaomi
+FCBF	ASSA ABLOY Opening Solutions Sweden
+FCBE	Musen Connect
+FCBD	Toshiba
+FCBC	Drowsy Digital
+FCBB	SharkNinja Operating
+FCBA	BlueID
+FCB9	Lumi United
+FCB8	Ribbiot
+FCB7	T-Mobile USA
+FCB6	OMRON HEALTHCARE
+FCB5	OMRON HEALTHCARE
+FCB4	OMRON HEALTHCARE
+FCB3	SWEEN
+FCB2	Apple
+FCB1	Google
+FCB0	Ford Motor
+FCAF	AltoBeam
+FCAE	Imagine Marketing
+FCAD	Beijing 99help Safety
+FCAC	IRISS
+FCAB	IRISS
+FCAA	Spintly
+FCA9	Medtronic
+FCA8	Medtronic
+FCA7	Hubble Network
+FCA6	Hubble Network
+FCA5	HAYWARD INDUSTRIES
+FCA4	HP
+FCA3	Gunnebo Aktiebolag
+FCA2	Meizu
+FCA1	PF SCHWEISSTECHNOLOGIE
+FCA0	Apple
+FC9F	Delta Development Team
+FC9E	Dell Computer
+FC9D	Lenovo (Singapore) Pte
+FC9B	Merry Electronics (S) Pte
+FC9A	Koppli
+FC99	Badger Meter
+FC98	Ruuvi Innovations
+FC97	Japan Display
+FC96	LEGO System
+FC95	Hippo Camp Software
+FC94	Apple
+FC93	Komatsu
+FC92	Furuno Electric
+FC91	Samsung Electronics
+FC90	Wiliot
+FC8F	Bose
+FC8E	Blue Iris Labs
+FC8D	Caire
+FC8C	VusionGroup
+FC8B	Kaspersky Lab Middle East FZ-LLC
+FC8A	Intel
+FC89	Intel
+FC88	CCC del Uruguay
+FC87	Samsara Networks
+FC86	Samsara Networks
+FC85	Zhejiang Huanfu
+FC84	NINGBO FOTILE KITCHENWARE
+FC83	iHealth Labs
+FC82	Zwift
+FC81	Axon Enterprise
+FC80	TELE System Communications Pte
+FC7F	Southco
+FC7E	Harman International
+FC7D	MML US
+FC7C	Motorola Mobility
+FC7B	Testo SE & KGaA
+FC7A	Outshiny India Private
+FC79	LG Electronics
+FC78	DHL
+FC77	SING SUN (INTERNATIONAL)
+FC76	Weber-Stephen Products
+FC75	Xiaomi
+FC74	EMBEINT
+FC73	Google
+FC72	iodyne
+FC71	Hive-Zox International
+FC70	MOTIVE
+FC6F	NextSense
+FC6E	stryker
+FC6D	MOTIVE
+FC6C	Powerstick.com
+FC6B	Sonos
+FC6A	Sonos
+FC69	Harman International
+FC68	RIGH
+FC67	Guangdong Hengqin Xingtong,ltd
+FC66	Xiaomi
+FC65	Robor Electronics
+FC64	Volvo
+FC63	Volvo
+FC62	SPRiNTUS
+FC61	QIKCONNEX
+FC60	Ohme Operations UK
+FC5F	PI-CRYSTAL
+FC5E	KUBU SMART
+FC5D	GP Acoustics International
+FC5C	PLASTIC RESEARCH AND DEVELOPMENT
+FC5B	Time Location Systems
+FC5A	LAST LOCK
+FC59	Ant Group
+FC58	Shenzhen Minew
+FC57	Ambient Life
+FC56	Google
+FC55	BYD
+FC54	Shenzhen Yinwang Intelligent
+FC53	LEGIC Identsystems
+FC52	LG Electronics
+FC51	Ant Group
+FC50	Ant Group
+FC4F	WaveRF
+FC4E	Lodestar
+FC4D	Lodestar
+FC4C	HP
+FC4B	WinMagic
+FC4A	Shenzhen Shokz,Ltd
+FC49	Golioth
+FC48	Michelin
+FC47	Shanghai Ingeek
+FC46	Xiaomi
+FC45	Mitsubishi Electric
+FC44	Block
+FC43	Atmosic
+FC42	Atmosic
+FC41	Yoto
+FC40	Yoto
+FC3F	Milwaukee Electric Tools
+FC3E	Google
+FC3D	Reelables
+FC3C	Eforthink
+FC3B	BONX
+FC3A	C.O.B.O
+FC39	Harman International
+FC38	SetPoint Medical
+FC37	TANlock
+FC36	PharmaSens
+FC35	Metabowerke
+FC34	Mitsubishi Electric
+FC32	InPlay
+FC31	Ford Motor
+FC30	Arashi Vision
+FC2F	Arashi Vision
+FC2E	Arashi Vision
+FC2D	Arashi Vision
+FC2C	Verkada
+FC2B	Elder
+FC2A	Troo
+FC29	Google
+FC28	TechnoPartner Tecnologia Ltda
+FC27	Barking Labs
+FC26	Hudl
+FC25	Trackonomy Systems
+FC24	Electronics and Telecommunications Resea
+FC23	Helvar
+FC22	InPlay
+FC21	Plejd
+FC20	PreStartGo
+FC1F	Eight Sleep

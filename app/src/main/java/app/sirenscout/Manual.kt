@@ -287,6 +287,12 @@ private fun ManualContent() {
 
     Section("RF monitoring (optional)")
     Para(
+        "Beta: radio monitoring is built but hasn't been tested with a real RTL-SDR dongle yet. If you try it, " +
+            "you're a beta tester - thank you. Feedback on what works, what doesn't and what could be better is very " +
+            "welcome: Settings > Radio > Send feedback, or Settings > Help & diagnostics > Suggest a feature or report a problem. " +
+            "Sharing the activity log (Settings > Help & diagnostics) with your report helps a lot."
+    )
+    Para(
         "A phone can't tune to police radio frequencies on its own. With a USB RTL-SDR dongle, Siren " +
             "can tell when a radio is transmitting near you. It only measures signal strength - it doesn't " +
             "play or decode audio."

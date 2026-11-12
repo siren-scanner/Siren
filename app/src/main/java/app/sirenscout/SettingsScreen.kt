@@ -255,6 +255,7 @@ private fun RadioSettings() {
     var band800 by remember { mutableStateOf(prefs.band800Shared) }
     var bandThreshold by remember { mutableFloatStateOf(prefs.bandThresholdDb) }
 
+    RfBetaNote()
     SettingRow(
         "RF monitoring (RTL-SDR)",
         if (auto) "Turned on by Auto-optimize whenever an RTL-SDR dongle is plugged in (or a remote receiver is set)."
@@ -429,4 +430,30 @@ private fun SuggestButtons() {
             "you can also change it for your own needs and share your version under the same license.",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
+}
+
+/** Radio monitoring hasn't been tried with a real dongle yet: say so, and ask for feedback. */
+@Composable
+private fun RfBetaNote() {
+    val context = LocalContext.current
+    androidx.compose.material3.Card {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Beta: not yet tested with a real dongle", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Radio monitoring is built but hasn't been tried with an actual RTL-SDR dongle yet. If you try it, " +
+                    "you're a beta tester - thank you! Feedback on what works, what doesn't and what could be better " +
+                    "is very welcome and helps fix problems and improve it.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (BuildConfig.REPO_URL.isNotEmpty()) {
+                TextButton(onClick = {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("${BuildConfig.REPO_URL}/issues/new/choose"))
+                        )
+                    }
+                }) { Text("Send feedback") }
+            }
+        }
+    }
 }

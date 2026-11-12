@@ -19,7 +19,7 @@ feature or report a problem* in the app.
 | Bluetooth LE | continuous scan | Axon body cameras and Axon Signal, Motorola/WatchGuard cameras, APX radios, Whelen / Federal Signal / Code 3 light-bar controllers, LIFEPAK / ZOLL / Stryker EMS gear, Flock and Raven units, AirTags, Tiles, SmartTags and Google Find Hub tags away from their owner |
 | Classic Bluetooth | discovery every 30 s | the same device names |
 | Wi-Fi | scan every 31 s (Android's limit) | Cradlepoint, Sierra Wireless AirLink, Peplink and Inseego vehicle routers |
-| Radio (optional) | RTL-SDR dongle | transmissions on police / fire bands (Band watch) or on channels you choose |
+| Radio (optional, beta) | RTL-SDR dongle | transmissions on police / fire bands (Band watch) or on channels you choose |
 
 Axon Signal is the most telling: those units start broadcasting when an officer turns on the
 light bar or siren, so the cameras start recording. Routers are low-confidence, because buses,
@@ -51,6 +51,12 @@ Needs JDK 17 and the Android SDK (platform 35), or open the folder in Android St
 `./gradlew testFossDebugUnitTest`.
 
 ## Radio monitoring
+
+> **Beta:** radio monitoring is built but hasn't been tested with a real RTL-SDR dongle yet. If
+> you try it, you're a beta tester - thank you! Please
+> [open an issue](https://github.com/siren-scanner/Siren/issues/new/choose) with what worked,
+> what didn't and what could be better, ideally with the activity log (Settings > Help &
+> diagnostics > Share activity log).
 
 A phone can't receive arbitrary frequencies by itself, so radio needs extra hardware: a USB
 RTL-SDR dongle (RTL-SDR Blog V3/V4) with a USB-C OTG adapter, and the **RTL2832U driver** app

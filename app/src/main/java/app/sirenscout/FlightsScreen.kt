@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** Look up any flight by number, callsign or tail number, see everything the feed knows, and track it. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, title: String) -> Unit) {
     val context = LocalContext.current
@@ -48,6 +49,36 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
     var query by remember { mutableStateOf("") }
     var from by remember { mutableStateOf("") }
     var to by remember { mutableStateOf("") }
+    var firstDay by remember { mutableStateOf(java.time.LocalDate.parse(Flights.tripDay())) }
+    var lastDay by remember { mutableStateOf(firstDay) }
+    /** Which date is being picked: "first" or "last". */
+    var picking by remember { mutableStateOf<String?>(null) }
+    val dayFormat = remember { java.time.format.DateTimeFormatter.ofPattern("EEE MMM d") }
+
+    picking?.let { which ->
+        val zone = java.time.ZoneOffset.UTC // the date picker works in UTC midnights
+        val state = androidx.compose.material3.rememberDatePickerState(
+            initialSelectedDateMillis = (if (which == "first") firstDay else lastDay).atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+        androidx.compose.material3.DatePickerDialog(
+            onDismissRequest = { picking = null },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { ms ->
+                        val d = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+                        if (which == "first") {
+                            firstDay = d
+                            if (lastDay < d) lastDay = d
+                        } else {
+                            lastDay = if (d < firstDay) firstDay else d
+                        }
+                    }
+                    picking = null
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { picking = null }) { Text("Cancel") } },
+        ) { androidx.compose.material3.DatePicker(state) }
+    }
     var result by remember { mutableStateOf<LiveFlight?>(null) }
     var message by remember { mutableStateOf("") }
     val tracked by Flights.tracked.collectAsStateWithLifecycle()
@@ -99,12 +130,26 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
                             label = { Text("To (optional)") }, supportingText = { Text(Airports.find(context, to)?.label ?: "e.g. JFK") },
                         )
                     }
+                    Text("Expected on", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { picking = "first" }, modifier = Modifier.weight(1f)) { Text(firstDay.format(dayFormat)) }
+                        Text("to")
+                        OutlinedButton(onClick = { picking = "last" }, modifier = Modifier.weight(1f)) { Text(lastDay.format(dayFormat)) }
+                    }
+                    Text(
+                        "Siren only follows the flight on these days, and starts afresh each day - handy for a flight that runs daily. A day runs until 4 am, so a late flight still counts.",
+                        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = { look() }, enabled = query.isNotBlank(), modifier = Modifier.weight(1f)) { Text("Look up") }
                         Button(
                             onClick = {
-                                Flights.track(context, TrackedFlight(query.trim().uppercase(), from.trim().uppercase(), to.trim().uppercase()))
-                                message = "Tracking ${query.trim().uppercase()}. You'll get a notification when it takes off, levels off, starts down, nears ${to.trim().uppercase().ifEmpty { "its destination" }}, lands, or has an emergency."
+                                val t = TrackedFlight(
+                                    query.trim().uppercase(), from.trim().uppercase(), to.trim().uppercase(),
+                                    startDay = firstDay.toString(), endDay = lastDay.toString(),
+                                )
+                                Flights.track(context, t)
+                                message = "Tracking ${t.id} on ${t.daysText}. You'll get a notification each of those days when it shows up, takes off, levels off, starts down, nears ${to.trim().uppercase().ifEmpty { "its destination" }}, lands, or has an emergency."
                             },
                             enabled = query.isNotBlank(),
                             modifier = Modifier.weight(1f),
@@ -128,9 +173,15 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
                                     )
                                     TextButton(onClick = { Flights.untrack(context, t.id) }) { Text("Stop") }
                                 }
-                                if (f != null) FlightCard(f, Airports.find(context, t.from), Airports.find(context, t.to), onShowOnMap)
+                                if (t.daysText.isNotEmpty()) Text(t.daysText, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                val today = Flights.tripDay()
+                                if (f != null && Flights.isActive(t, today)) FlightCard(f, Airports.find(context, t.from), Airports.find(context, t.to), onShowOnMap)
                                 else Text(
-                                    if (t.id in live) "Not on the feed right now - checked every minute." else "Checking…",
+                                    when {
+                                        t.startDay > today -> "Waiting - Siren starts following it on ${t.daysText.substringBefore(" –")}."
+                                        t.id in live -> "Not on the feed right now - checked every minute."
+                                        else -> "Checking…"
+                                    },
                                     style = MaterialTheme.typography.bodySmall, color = Color.Gray,
                                 )
                             }
@@ -141,8 +192,8 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
                     Text(
                         "Live data from the free adsb.lol ADS-B feed (volunteer receivers, so remote areas and oceans can have gaps); " +
                             "aircraft type and owner from hexdb.io. Departure and arrival airports aren't broadcast by aircraft - enter them " +
-                            "to see distance and time remaining. Tracked flights are checked every minute, even when Siren isn't scanning, " +
-                            "and are dropped after 36 hours.",
+                            "to see distance and time remaining. Tracked flights are checked every minute on their days, even when Siren isn't " +
+                            "scanning, and are dropped after their last day.",
                         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
                     )
                 }

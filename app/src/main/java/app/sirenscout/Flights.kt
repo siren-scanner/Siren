@@ -61,18 +61,33 @@ data class LiveFlight(
     val secondsSinceSeen: Double?,
 )
 
-/** A flight the user asked to follow, with optional airports they entered. */
+/**
+ * A flight the user asked to follow, with optional airports they entered and the days they expect
+ * it ([startDay]..[endDay], ISO dates; blank: from now for 36 hours).
+ */
 data class TrackedFlight(
     val query: String,
     val from: String = "",
     val to: String = "",
+    val startDay: String = "",
+    val endDay: String = "",
     val addedAt: Long = System.currentTimeMillis(),
-    /** Status messages already sent, so each goes out once. */
+    /** Status messages already sent ("<day>:<what>"), so each goes out once a day. */
     val notified: Set<String> = emptySet(),
     val phase: String = "",
     val lastSeenAt: Long = 0,
 ) {
     val id get() = query.uppercase()
+
+    /** "Nov 15" or "Nov 15 – Nov 17"; empty without dates. */
+    val daysText: String
+        get() {
+            if (startDay.isEmpty()) return ""
+            val f = java.time.format.DateTimeFormatter.ofPattern("EEE MMM d")
+            val a = java.time.LocalDate.parse(startDay)
+            val b = endDay.takeIf { it.isNotEmpty() }?.let(java.time.LocalDate::parse) ?: a
+            return if (a == b) a.format(f) else "${a.format(f)} – ${b.format(f)}"
+        }
 }
 
 /**
@@ -81,8 +96,22 @@ data class TrackedFlight(
  */
 object Flights {
     private const val API = "https://api.adsb.lol/v2"
-    /** Tracked flights are dropped this long after they're added. */
+    /** Tracked flights without dates are dropped this long after they're added. */
     private const val KEEP_MS = 36 * 3_600_000L
+    /** A flight "day" runs until this hour the next morning, so a late flight landing after midnight still counts. */
+    private const val DAY_ENDS_AT_HOUR = 4L
+
+    /** The flight day [now] falls in, as an ISO date. */
+    fun tripDay(now: Long = System.currentTimeMillis()): String =
+        java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.systemDefault()).minusHours(DAY_ENDS_AT_HOUR).toLocalDate().toString()
+
+    /** Whether [t] is expected on [day] (always, for a flight without dates). */
+    fun isActive(t: TrackedFlight, day: String): Boolean =
+        t.startDay.isEmpty() || (day >= t.startDay && day <= t.endDay.ifEmpty { t.startDay })
+
+    /** Still worth keeping: its last day hasn't passed, or (without dates) it was added in the last 36 hours. */
+    private fun current(t: TrackedFlight, now: Long) =
+        if (t.startDay.isEmpty()) now - t.addedAt < KEEP_MS else tripDay(now) <= t.endDay.ifEmpty { t.startDay }
 
     /** Two-letter airline codes on tickets, to the three-letter codes aircraft broadcast, and the airline. */
     val AIRLINES: Map<String, Pair<String, String>> = listOf(
@@ -206,8 +235,10 @@ object Flights {
     ): Pair<List<Update>, TrackedFlight> {
         val name = live?.callsign ?: t.query.uppercase()
         val out = mutableListOf<Update>()
+        // Each day starts afresh, so a flight tracked over several days is reported every day.
+        val day = tripDay(now)
         fun once(key: String, title: String, text: String) {
-            if (key !in t.notified) out += Update(key, "$name: $title", text)
+            if ("$day:$key" !in t.notified) out += Update("$day:$key", "$name: $title", text)
         }
         if (live == null) {
             val wasFlying = t.phase.isNotEmpty() && t.phase != "ground"
@@ -266,10 +297,11 @@ object Flights {
             List(a.length()) { a.getJSONObject(it) }.map { j ->
                 TrackedFlight(
                     query = j.getString("query"), from = j.optString("from"), to = j.optString("to"),
+                    startDay = j.optString("startDay"), endDay = j.optString("endDay"),
                     addedAt = j.optLong("addedAt"), phase = j.optString("phase"), lastSeenAt = j.optLong("lastSeenAt"),
                     notified = j.optJSONArray("notified")?.let { n -> List(n.length()) { n.getString(it) }.toSet() }.orEmpty(),
                 )
-            }.filter { System.currentTimeMillis() - it.addedAt < KEEP_MS }
+            }.filter { current(it, System.currentTimeMillis()) }
         }.getOrDefault(emptyList())
     }
 
@@ -278,6 +310,7 @@ object Flights {
         _tracked.value = list
         val json = JSONArray(list.map { t ->
             JSONObject().put("query", t.query).put("from", t.from).put("to", t.to).put("addedAt", t.addedAt)
+                .put("startDay", t.startDay).put("endDay", t.endDay)
                 .put("phase", t.phase).put("lastSeenAt", t.lastSeenAt).put("notified", JSONArray(t.notified.toList()))
         })
         context.applicationContext.getSharedPreferences("flights", Context.MODE_PRIVATE).edit().putString("tracked", json.toString()).apply()
@@ -295,10 +328,10 @@ object Flights {
         live.value = live.value - id
     }
 
-    /** Drops flights older than [KEEP_MS]; true if any are left. */
+    /** Drops flights whose days are over; true if any are left. */
     fun prune(context: Context): Boolean {
         load(context)
-        val keep = _tracked.value.filter { System.currentTimeMillis() - it.addedAt < KEEP_MS }
+        val keep = _tracked.value.filter { current(it, System.currentTimeMillis()) }
         if (keep.size != _tracked.value.size) save(context, keep)
         return keep.isNotEmpty()
     }

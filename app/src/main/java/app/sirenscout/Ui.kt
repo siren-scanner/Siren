@@ -145,6 +145,26 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
         val visible = items.values.filterNot(hidden::hides)
         val air = AirWatch.contacts.collectAsStateWithLifecycle().value.values
             .sortedWith(compareBy<AirContact> { it.distanceM ?: Double.MAX_VALUE }.thenByDescending { it.lastSeen })
+        // Flights you're tracking, wherever they are, drawn on the map in orange.
+        val trackedLive = Flights.live.collectAsStateWithLifecycle().value
+        val onMap = air + trackedLive.mapNotNull { (id, f) ->
+            if (f?.lat == null || f.lon == null) null
+            else AirContact(
+                key = "flight|$id", kind = AirContact.Kind.TRACKED_FLIGHT, title = f.callsign ?: id,
+                detail = listOfNotNull(Flights.airline(f.callsign), f.registration, f.typeCode).joinToString(" · "),
+                lat = f.lat, lon = f.lon, altitudeText = if (f.onGround) "on the ground" else f.altitudeFt?.let { "%,d ft".format(it) },
+                speedMs = f.speedKt?.let { it * 0.514444 }, headingDeg = f.trackDeg, firstSeen = now, lastSeen = now,
+            )
+        }
+        var showFlights by remember { mutableStateOf(false) }
+        if (showFlights) FlightsDialog(
+            onClose = { showFlights = false },
+            onShowOnMap = { lat, lon, title ->
+                showFlights = false
+                showMap = true
+                MapFocus.pending.value = MapFocus.Request("flight|$title", lat, lon, title)
+            },
+        )
         val matches = visible.filter { it.signature != null }.sortedByDescending { it.lastSeen }
         // Trackers are everywhere in other people's things; they alert only when they follow you.
         val active = matches.filter {
@@ -328,7 +348,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                                 sourceRow()
                                 missingFix()
                             }
-                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = air, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = onMap, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
                         }
                     } else {
                         Column(
@@ -341,7 +361,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                             tabRow()
                             sourceRow()
                             missingFix()
-                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = air, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = onMap, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
                         }
                     }
                 }
@@ -355,6 +375,11 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                     item { AlertBanner(active, status.running) }
                     item { tabRow() }
                     if (tab == Tab.AIR) {
+                        item {
+                            OutlinedButton(onClick = { showFlights = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Search & track flights" + Flights.tracked.value.size.takeIf { it > 0 }?.let { " ($it tracked)" }.orEmpty())
+                            }
+                        }
                         item {
                             val feed by AirWatch.feedStatus.collectAsStateWithLifecycle()
                             if (status.running && feed.isNotEmpty()) Text(feed, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
@@ -421,6 +446,7 @@ fun airColor(kind: AirContact.Kind) = when (kind) {
     AirContact.Kind.DRONE, AirContact.Kind.AIRCRAFT -> AIR_COLOR
     AirContact.Kind.POSSIBLE_AIRCRAFT -> Color(0xFFB39DDB)
     AirContact.Kind.OTHER_AIRCRAFT -> Color(0xFF9E9E9E)
+    AirContact.Kind.TRACKED_FLIGHT -> Color(0xFFFF9800)
 }
 
 @Composable

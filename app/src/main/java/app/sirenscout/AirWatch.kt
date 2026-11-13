@@ -32,6 +32,7 @@ data class AirContact(
         /** Owned by a city, county or state government: often police, fire or rescue. */
         POSSIBLE_AIRCRAFT("Possible police or first-responder aircraft"),
         OTHER_AIRCRAFT("Aircraft"),
+        TRACKED_FLIGHT("Your tracked flight"),
     }
 }
 

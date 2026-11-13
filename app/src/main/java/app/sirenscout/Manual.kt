@@ -258,6 +258,13 @@ private fun ManualContent() {
     Bullet("You get an alert (with its own falling \"whoosh\" sound) when a drone is first heard and when a police aircraft comes within the alert distance (default 5 miles, Settings > Drones & aircraft), then again only after 30 minutes. Aircraft further away still show in the Air tab.")
     Bullet("Police can switch ADS-B off on sensitive flights, and some aircraft are registered to companies rather than the agency flying them, so no alert doesn't mean nothing overhead. The aircraft list comes from the FAA registry at the time of the app version you have.")
 
+    Section("Flights")
+    Bullet("Air tab > Search & track flights looks up any flight in the world by flight number (AA100), callsign (AAL100) or tail number (N12345), wherever it is - it doesn't need to be near you.")
+    Bullet("It shows the airline, whether it's on the ground, climbing, cruising or descending, altitude and climb rate, the altitude it's heading for, speed, heading, position and distance from you, squawk code and any emergency, the registration, aircraft type and owner. It refreshes every 30 seconds while open. Tap the position to see it on the map.")
+    Bullet("Aircraft don't broadcast where they're flying from or to, so enter From and To airport codes (DFW, JFK…) if you know them: Siren then shows distance and time remaining.")
+    Bullet("Track & notify follows the flight in the background every minute, even when Siren isn't scanning, and notifies you when it's found, takes off, reaches cruising altitude, starts descending, is about to arrive, lands, comes near you, squawks an emergency, or goes quiet for 10 minutes. It shows on the map in orange. Stop removes it; flights are dropped after 36 hours.")
+    Bullet("Coverage comes from volunteer receivers, so flights over oceans and remote areas can disappear for a while. A flight that hasn't departed yet shows as not on the feed - you'll be told when it appears.")
+
     Section("History and export")
     Bullet("Matched detections are saved automatically to the phone every 15 seconds while scanning, and when you stop. Unmatched devices are not saved.")
     Bullet("Each saved row is an encounter. If a device goes 10 minutes without being seen, its next sighting starts a new encounter with its own map pin.")
@@ -385,6 +392,7 @@ private val TOPICS = listOfNotNull(
     "Map" to "Map",
     "Known plate-reader cameras" to "Cameras",
     "Drones and police aircraft (beta)" to "Air",
+    "Flights" to "Flights",
     "History and export" to "History",
     "Backing up and moving phones" to "Backup",
     "Sharing and updates" to "Sharing",

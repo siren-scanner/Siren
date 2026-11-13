@@ -21,6 +21,7 @@ feature or report a problem* in the app.
 | Wi-Fi | scan every 31 s (Android's limit) | Cradlepoint, Sierra Wireless AirLink, Peplink and Inseego vehicle routers |
 | Drones (beta) | Bluetooth / Wi-Fi Remote ID | any drone broadcasting FAA Remote ID: serial, position, height, operator position |
 | Police aircraft (beta, online) | adsb.lol ADS-B feed | helicopters and planes registered to police, sheriffs, state patrols and federal law enforcement (FAA registry) |
+| Flights | adsb.lol ADS-B feed | look up and track any flight by number, callsign or tail number, with status notifications |
 | Radio (optional, beta) | RTL-SDR dongle | transmissions on police / fire bands (Band watch) or on channels you choose |
 
 Axon Signal is the most telling: those units start broadcasting when an officer turns on the

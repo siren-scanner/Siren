@@ -66,6 +66,8 @@ class MainActivity : ComponentActivity() {
         WatchRules.init(this)
         LocationMarker.init(this)
         AiGuesser.init(this)
+        Flights.load(this)
+        FlightWatchService.start(this) // picks up flights tracked before Siren was closed
         // On-device AI is only allowed while the app is on screen, so tie it to the resumed state.
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) { AiGuesser.run(this@MainActivity) }

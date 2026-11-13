@@ -46,9 +46,11 @@ import kotlinx.coroutines.withContext
 fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, title: String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var query by remember { mutableStateOf("") }
-    var from by remember { mutableStateOf("") }
-    var to by remember { mutableStateOf("") }
+    // The last search stays in the boxes when you come back.
+    var recent by remember { mutableStateOf(Flights.recent(context)) }
+    var query by remember { mutableStateOf(recent.firstOrNull()?.query.orEmpty()) }
+    var from by remember { mutableStateOf(recent.firstOrNull()?.from.orEmpty()) }
+    var to by remember { mutableStateOf(recent.firstOrNull()?.to.orEmpty()) }
     var firstDay by remember { mutableStateOf(java.time.LocalDate.parse(Flights.tripDay())) }
     var lastDay by remember { mutableStateOf(firstDay) }
     /** Which date is being picked: "first" or "last". */
@@ -85,6 +87,7 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
     val live by Flights.live.collectAsStateWithLifecycle()
 
     fun look() = scope.launch {
+        recent = Flights.remember(context, Flights.Search(query.trim().uppercase(), from.trim().uppercase(), to.trim().uppercase()))
         message = "Looking up ${query.trim().uppercase()}…"
         result = null
         runCatching { withContext(Dispatchers.IO) { Flights.lookup(context, query) } }
@@ -94,6 +97,9 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
             }
             .onFailure { message = "Couldn't reach the flight feed (${it.javaClass.simpleName}). Is mobile data on?" }
     }
+
+    // Coming back to the screen shows the last flight again.
+    LaunchedEffect(Unit) { if (query.isNotBlank()) look() }
 
     // Keep the open result fresh.
     LaunchedEffect(result?.hex) {
@@ -149,6 +155,7 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
                                     startDay = firstDay.toString(), endDay = lastDay.toString(),
                                 )
                                 Flights.track(context, t)
+                                recent = Flights.remember(context, Flights.Search(t.id, t.from, t.to))
                                 message = "Tracking ${t.id} on ${t.daysText}. You'll get a notification each of those days when it shows up, takes off, levels off, starts down, nears ${to.trim().uppercase().ifEmpty { "its destination" }}, lands, or has an emergency."
                             },
                             enabled = query.isNotBlank(),
@@ -158,6 +165,27 @@ fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, t
                     if (message.isNotEmpty()) Text(message, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     result?.let { f ->
                         FlightCard(f, Airports.find(context, from), Airports.find(context, to), onShowOnMap)
+                    }
+
+                    if (recent.size > 1 || (recent.size == 1 && !recent[0].query.equals(query.trim(), ignoreCase = true))) {
+                        HorizontalDivider()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Recent searches", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { Flights.clearRecent(context); recent = emptyList() }) { Text("Clear") }
+                        }
+                        recent.forEach { r ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    r.query + listOf(r.from, r.to).filter { it.isNotEmpty() }.joinToString(" → ", prefix = "   "),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f).clickable {
+                                        query = r.query; from = r.from; to = r.to
+                                        look()
+                                    }.padding(vertical = 6.dp),
+                                )
+                                TextButton(onClick = { recent = Flights.forget(context, r.query) }) { Text("Remove") }
+                            }
+                        }
                     }
 
                     if (tracked.isNotEmpty()) {

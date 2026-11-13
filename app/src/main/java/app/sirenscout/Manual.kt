@@ -249,9 +249,12 @@ private fun ManualContent() {
     Bullet("Turn the layer off or change the alert distance in Settings > Plate readers.")
 
     Section("Drones and police aircraft (beta)")
-    Para(
+    if (BuildConfig.REPO_URL.isNotEmpty()) Para(
         "New and not yet tested in the field - if you try it, you're a beta tester, and feedback is very welcome " +
-            "(Settings > Drones & aircraft > Send feedback). Both show in the Air tab and on the map as purple arrows " +
+            "(Settings > Drones & aircraft > Send feedback).",
+    )
+    Para(
+        "Both show in the Air tab and on the map as purple arrows " +
             "pointing where they're heading. Tap one in the Air tab, or tap its arrow on the map and then its bubble, for " +
             "everything known about it - for aircraft, the live feed's full details (altitude, climb rate, speed, " +
             "registration, type, owner) and Track & notify; for drones, everything its Remote ID said, including where the " +
@@ -295,7 +298,7 @@ private fun ManualContent() {
     Bullet("Syncing, like Add shared data, only adds. Un-hiding a device on one phone doesn't un-hide it on the other. Siren only syncs over Tailscale: it listens on the phone's Tailscale address alone, only sends to Tailscale addresses (100.x.x.x or .ts.net names), and only devices that know the code can connect; New code locks out a phone you've stopped using. History is only synced if Include history is on.")
     Bullet("To give Siren to someone else, tap Settings > Backup, sharing & updates > Share Siren. It sends the copy installed on your phone through Android's share menu (Quick Share, Bluetooth, a messaging app). They open the file to install it, allowing installs from that app when Android asks. ${if (SELF_UPDATES) "Their copy won't update itself unless you share your laptop with them in Tailscale." else "Their copy won't update itself; installing Siren from F-Droid instead keeps it up to date."}")
     Bullet("Settings > Help & diagnostics > What's new lists what changed in every version, newest first.")
-    Bullet("Siren is open source. Settings > Help & diagnostics > Suggest a feature or report a problem opens its project page, where you can suggest features, report bugs or propose new device signatures. Anyone may change Siren for their own needs and share their version under the same license (GPL-3.0).")
+    if (BuildConfig.REPO_URL.isNotEmpty()) Bullet("Siren is open source. Settings > Help & diagnostics > Suggest a feature or report a problem opens its project page, where you can suggest features, report bugs or propose new device signatures. Anyone may change Siren for their own needs and share their version under the same license (GPL-3.0).")
     if (SELF_UPDATES) {
         Bullet("New versions are published from your laptop over Tailscale, a private network between your own devices. Keep the Tailscale app installed and connected on your phone.")
         Bullet("Siren checks for a new version when you open it (at most every 6 hours), and offers Update. Settings > Backup, sharing & updates > Check for updates checks right away.")
@@ -307,14 +310,14 @@ private fun ManualContent() {
     }
 
     Section("Crash reports and diagnostics")
-    Bullet("If Siren crashes, it saves a report on the phone. Next time you open it, you're offered Share report, which opens Android's share menu so you can send it however you like - for example attached to a bug report (Settings > Help & diagnostics > Suggest a feature or report a problem).")
+    Bullet("If Siren crashes, it saves a report on the phone. Next time you open it, you're offered Share report, which opens Android's share menu so you can send it however you like${if (BuildConfig.REPO_URL.isNotEmpty()) " - for example attached to a bug report (Settings > Help & diagnostics > Suggest a feature or report a problem)" else ""}.")
     Bullet("While scanning, Settings > Help & diagnostics shows live scan health: Bluetooth broadcasts heard in the last minute, devices found by classic Bluetooth, how long ago Wi-Fi results last arrived, and any scan failures. Zero Bluetooth broadcasts or stale Wi-Fi results come with a hint about what to check.")
     Bullet("Settings > Help & diagnostics > Share last crash sends the newest report again. Share activity log sends a record of what the app has been doing (scanners starting and stopping, download failures, declined prompts) - useful when something isn't working but nothing crashed.")
     Bullet("Reports include the app version, Android version and phone model. They don't include locations or history, and any device address in them is cut to its maker part (00:25:DF:••:••:••).")
     Bullet("The last 10 crash reports are kept. Delete clears them.")
 
     Section("RF monitoring (optional)")
-    Para(
+    if (BuildConfig.REPO_URL.isNotEmpty()) Para(
         "Beta: radio monitoring is built but hasn't been tested with a real RTL-SDR dongle yet. If you try it, " +
             "you're a beta tester - thank you. Feedback on what works, what doesn't and what could be better is very " +
             "welcome: Settings > Radio > Send feedback, or Settings > Help & diagnostics > Suggest a feature or report a problem. " +

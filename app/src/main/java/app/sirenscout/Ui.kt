@@ -355,6 +355,10 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                     item { AlertBanner(active, status.running) }
                     item { tabRow() }
                     if (tab == Tab.AIR) {
+                        item {
+                            val feed by AirWatch.feedStatus.collectAsStateWithLifecycle()
+                            if (status.running && feed.isNotEmpty()) Text(feed, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
                         if (air.isEmpty()) item {
                             Text(
                                 if (status.running) "No drones or police aircraft around right now." else "Press Start to listen for drones and check for police aircraft.",
@@ -384,7 +388,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
 private fun AirRow(c: AirContact, now: Long, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(6.dp).fillMaxHeight().background(AIR_COLOR))
+            Box(Modifier.width(6.dp).fillMaxHeight().background(if (c.kind == AirContact.Kind.OTHER_AIRCRAFT) Color.Gray else AIR_COLOR))
             Column(Modifier.padding(12.dp)) {
                 Text(c.title, style = MaterialTheme.typography.titleMedium)
                 Text(c.kind.label + " · " + c.detail, style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE))

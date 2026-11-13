@@ -60,8 +60,11 @@ object Adsb {
         }
     }
 
-    /** Law-enforcement aircraft around ([lat], [lon]); throws if the feed can't be reached. */
-    fun fetchPolice(context: Context, lat: Double, lon: Double): List<Pair<Aircraft, Registration>> {
+    /**
+     * Every aircraft around ([lat], [lon]), with its law-enforcement registration if it has one;
+     * throws if the feed can't be reached.
+     */
+    fun fetch(context: Context, lat: Double, lon: Double): List<Pair<Aircraft, Registration?>> {
         val reg = registrations(context)
         val url = "$API/${KnownCameras.roundForQuery(lat)}/${KnownCameras.roundForQuery(lon)}/$RADIUS_NM"
         val conn = URL(url).openConnection() as HttpURLConnection
@@ -74,6 +77,6 @@ object Adsb {
         } finally {
             conn.disconnect()
         }
-        return parseFeed(body).mapNotNull { a -> reg[a.hex]?.let { a to it } }
+        return parseFeed(body).map { a -> a to reg[a.hex] }
     }
 }

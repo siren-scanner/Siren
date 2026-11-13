@@ -153,6 +153,10 @@ class Prefs(context: Context) {
     var airAircraft: Boolean
         get() = sp.getBoolean("air_aircraft", BuildConfig.TEST_BUILD)
         set(v) = sp.edit().putBoolean("air_aircraft", v).apply()
+    /** Also list every other aircraft (no alerts), e.g. to check the feed is working. */
+    var airShowAll: Boolean
+        get() = sp.getBoolean("air_show_all", false)
+        set(v) = sp.edit().putBoolean("air_show_all", v).apply()
     /** Alert when a police aircraft is within this many miles. */
     var airAlertMiles: Float
         get() = sp.getFloat("air_alert_miles", 5f)

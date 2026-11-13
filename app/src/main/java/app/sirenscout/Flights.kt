@@ -165,6 +165,13 @@ object Flights {
     /** The flight right now, or null if the feed doesn't see it (not flying, or out of coverage). Throws on network errors. */
     fun lookup(context: Context, query: String): LiveFlight? {
         val (kind, value) = lookupPath(query) ?: return null
+        return fetch(context, kind, value)
+    }
+
+    /** The aircraft with this ICAO address right now, or null if the feed doesn't see it. */
+    fun lookupHex(context: Context, hex: String): LiveFlight? = fetch(context, "hex", hex.lowercase())
+
+    private fun fetch(context: Context, kind: String, value: String): LiveFlight? {
         val conn = URL("$API/$kind/${URLEncoder.encode(value, "UTF-8")}").openConnection() as HttpURLConnection
         conn.connectTimeout = 15_000
         conn.readTimeout = 20_000

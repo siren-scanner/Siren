@@ -12,6 +12,9 @@ Siren deletes all of it.
   about 10 km.
 - **Police aircraft** (Settings > Drones & aircraft > Police aircraft, if on) from the free ADS-B feed
   at adsb.lol, every 30 seconds while scanning, for your area rounded to about 10 km.
+- **Flights you look up or track:** the flight number, callsign or tail number goes to adsb.lol, and the
+  aircraft's address to hexdb.io for its type and owner. Your location isn't sent; distance from you is
+  worked out on the phone.
 - Only if you turn them on yourself:
   - **Car display:** a web page served by your phone to devices on the same local network
     (your car on the phone's hotspot, for example), protected by a code.

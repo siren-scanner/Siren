@@ -10,5 +10,8 @@ Siren ships lookup tables used to guess who made a device (`app/src/main/assets`
 - `police_aircraft.txt` - aircraft registered to law-enforcement agencies, filtered from the FAA
   aircraft registry (public domain) by `tools/build-police-aircraft.py`.
 
-Live aircraft positions come from [adsb.lol](https://adsb.lol), open data under the Open Database
+- `airports.txt` - airport codes, names and positions from [OurAirports](https://ourairports.com)
+  (public domain), built by `tools/build-airports.py`.
+
+Aircraft type and owner details come from [hexdb.io](https://hexdb.io). Live aircraft positions come from [adsb.lol](https://adsb.lol), open data under the Open Database
 License. Map data © OpenStreetMap contributors, available under the Open Database License.

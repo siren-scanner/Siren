@@ -682,7 +682,7 @@ class ScanService : Service() {
         val away = c.distanceM?.let { formatShortDistance(it) + " away" }
         val title = when (c.kind) {
             AirContact.Kind.DRONE -> "Drone nearby"
-            AirContact.Kind.AIRCRAFT, AirContact.Kind.OTHER_AIRCRAFT -> "Police aircraft nearby: ${c.title}"
+            AirContact.Kind.AIRCRAFT, AirContact.Kind.OTHER_AIRCRAFT, AirContact.Kind.TRACKED_FLIGHT -> "Police aircraft nearby: ${c.title}"
             AirContact.Kind.POSSIBLE_AIRCRAFT -> "Possible police / first-responder aircraft: ${c.title}"
         }
         val text = listOfNotNull(away, c.altitudeText, c.headingDeg?.let { "heading ${compass(it.toFloat())}" }).joinToString(" · ")

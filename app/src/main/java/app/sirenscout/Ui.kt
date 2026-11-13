@@ -147,8 +147,12 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             .sortedWith(compareBy<AirContact> { it.distanceM ?: Double.MAX_VALUE }.thenByDescending { it.lastSeen })
         // Flights you're tracking, wherever they are, drawn on the map in orange.
         val trackedLive = Flights.live.collectAsStateWithLifecycle().value
-        val onMap = air + trackedLive.mapNotNull { (id, f) ->
-            if (f?.lat == null || f.lon == null) null
+        // A tracked flight the police-aircraft check also found is drawn once, as that aircraft, marked as tracked.
+        val trackedHexes = trackedLive.values.mapNotNullTo(HashSet()) { it?.hex }
+        val onMap = air.map { c ->
+            if (c.key.substringAfter("aircraft|", "") in trackedHexes) c.copy(detail = c.detail + " · you're tracking it") else c
+        } + trackedLive.mapNotNull { (id, f) ->
+            if (f?.lat == null || f.lon == null || air.any { it.key == "aircraft|${f.hex}" }) null
             else AirContact(
                 key = "flight|$id", kind = AirContact.Kind.TRACKED_FLIGHT, title = f.callsign ?: id,
                 detail = listOfNotNull(Flights.airline(f.callsign), f.registration, f.typeCode).joinToString(" · "),

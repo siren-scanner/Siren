@@ -508,7 +508,8 @@ private fun AirSettings() {
     SettingRow(
         "Police aircraft (online)",
         "Checks the free community ADS-B feed at adsb.lol every 30 seconds for helicopters and planes registered to police, " +
-            "sheriffs, state patrols and federal law enforcement. Needs a data connection; the feed is only told your area, " +
+            "sheriffs, state patrols and federal law enforcement, plus city, county and state government aircraft (shown as " +
+            "possible police or first responder). Needs a data connection; the feed is only told your area, " +
             "rounded to about 10 km. Aircraft can switch ADS-B off, so no alert doesn't mean none overhead.",
         aircraft,
     ) { aircraft = it; prefs.airAircraft = it }

@@ -372,7 +372,7 @@ private class AirLayer {
         for (gone in markers.keys - keys) markers.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
         for (gone in operators.keys - keys) operators.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
         for (c in air) {
-            val color = if (c.kind == AirContact.Kind.OTHER_AIRCRAFT) 0xFF9E9E9E.toInt() else AIR_COLOR.toArgb()
+            val color = airColor(c.kind).toArgb()
             if (c.lat != null && c.lon != null) {
                 val m = markers.getOrPut(c.key) {
                     Marker(map).apply {

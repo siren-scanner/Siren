@@ -388,7 +388,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
 private fun AirRow(c: AirContact, now: Long, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(6.dp).fillMaxHeight().background(if (c.kind == AirContact.Kind.OTHER_AIRCRAFT) Color.Gray else AIR_COLOR))
+            Box(Modifier.width(6.dp).fillMaxHeight().background(airColor(c.kind)))
             Column(Modifier.padding(12.dp)) {
                 Text(c.title, style = MaterialTheme.typography.titleMedium)
                 Text(c.kind.label + " · " + c.detail, style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE))
@@ -415,6 +415,13 @@ private fun AirRow(c: AirContact, now: Long, onClick: () -> Unit) {
 
 /** Drones and aircraft, in the list and on the map. */
 val AIR_COLOR = Color(0xFF7E57C2)
+
+/** Purple for drones and police aircraft, lighter for possible ones, grey for everything else. */
+fun airColor(kind: AirContact.Kind) = when (kind) {
+    AirContact.Kind.DRONE, AirContact.Kind.AIRCRAFT -> AIR_COLOR
+    AirContact.Kind.POSSIBLE_AIRCRAFT -> Color(0xFFB39DDB)
+    AirContact.Kind.OTHER_AIRCRAFT -> Color(0xFF9E9E9E)
+}
 
 @Composable
 private fun Header(status: ScanStatus, onStart: () -> Unit, onStop: () -> Unit, onToggleSettings: () -> Unit) {

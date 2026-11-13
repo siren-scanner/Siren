@@ -78,8 +78,10 @@ class AirTest {
         assertEquals(1200, ac[0].altitudeFt)
         assertTrue(ac[1].onGround)
 
-        val reg = Adsb.parseRegistry("a1423f\tN180SC\tSt Clair County Sheriffs Dept\tBell OH-58\n")
+        val reg = Adsb.parseRegistry("a1423f\tN180SC\tSt Clair County Sheriffs Dept\tBell OH-58\tpolice\nab0001\tN1LA\tCity Of Los Angeles\tAirbus H125\tpossible\n")
         assertEquals("St Clair County Sheriffs Dept", reg["a1423f"]!!.owner)
+        assertTrue(reg["a1423f"]!!.police)
+        assertTrue(!reg["ab0001"]!!.police)
     }
 
     @Test
@@ -134,5 +136,22 @@ class AirTest {
         assertEquals("UAL995", AirWatch.contacts.value.getValue("aircraft|a00002").title)
         AirWatch.onAircraft(listOf(airliner to null), 40.0, -100.0, 8_000.0, showAll = false, now = 9_030_000L)
         assertTrue(AirWatch.contacts.value.isEmpty())
+    }
+
+    @Test
+    fun `city and county aircraft show as possible responders and alert`() {
+        AirWatch.clear()
+        val heli = Adsb.Aircraft("ab0001", "N1LA", 40.02, -100.0, 900, 80.0, 0.0, onGround = false)
+        val reg = Adsb.Registration("N1LA", "City Of Los Angeles", "Airbus H125", police = false)
+        val alerts = AirWatch.onAircraft(listOf(heli to reg), 40.0, -100.0, 8_000.0, now = 12_000_000L)
+        assertEquals(AirContact.Kind.POSSIBLE_AIRCRAFT, alerts.single().kind)
+    }
+
+    @Test
+    fun `the shipped list has both police and possible aircraft`() {
+        val reg = Adsb.parseRegistry(File("src/main/assets/police_aircraft.txt").readText())
+        assertTrue(reg.values.count { it.police } > 500)
+        assertTrue(reg.values.count { !it.police } > 500)
+        assertTrue(reg.values.none { !it.police && it.owner.contains("University", ignoreCase = true) })
     }
 }

@@ -26,7 +26,13 @@ data class AirContact(
     val firstSeen: Long,
     val lastSeen: Long,
 ) {
-    enum class Kind(val label: String) { DRONE("Drone"), AIRCRAFT("Police aircraft"), OTHER_AIRCRAFT("Aircraft") }
+    enum class Kind(val label: String) {
+        DRONE("Drone"),
+        AIRCRAFT("Police aircraft"),
+        /** Owned by a city, county or state government: often police, fire or rescue. */
+        POSSIBLE_AIRCRAFT("Possible police or first-responder aircraft"),
+        OTHER_AIRCRAFT("Aircraft"),
+    }
 }
 
 /**
@@ -107,7 +113,11 @@ object AirWatch {
             val key = "aircraft|${a.hex}"
             AirContact(
                 key = key,
-                kind = if (reg != null) AirContact.Kind.AIRCRAFT else AirContact.Kind.OTHER_AIRCRAFT,
+                kind = when {
+                    reg == null -> AirContact.Kind.OTHER_AIRCRAFT
+                    reg.police -> AirContact.Kind.AIRCRAFT
+                    else -> AirContact.Kind.POSSIBLE_AIRCRAFT
+                },
                 title = reg?.owner ?: a.callsign ?: a.hex.uppercase(),
                 detail = if (reg != null) listOfNotNull(reg.model.ifEmpty { null }, reg.tail, a.callsign?.takeIf { it != reg.tail }).joinToString(" · ")
                 else "not on the law-enforcement list",
@@ -123,7 +133,8 @@ object AirWatch {
         }
         _contacts.update { it + updated.associateBy { c -> c.key } }
         return updated.filter { c ->
-            val near = c.kind == AirContact.Kind.AIRCRAFT && c.distanceM?.let { it <= alertWithinM } == true
+            val listed = c.kind == AirContact.Kind.AIRCRAFT || c.kind == AirContact.Kind.POSSIBLE_AIRCRAFT
+            val near = listed && c.distanceM?.let { it <= alertWithinM } == true
             near && c.altitudeText != "on the ground" && shouldAlert(c.key, now)
         }
     }

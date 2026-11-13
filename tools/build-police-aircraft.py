@@ -4,8 +4,10 @@
 Usage: tools/build-police-aircraft.py MASTER.txt ACFTREF.txt > app/src/main/assets/police_aircraft.txt
 Get both files from https://registry.faa.gov/database/ReleasableAircraft.zip (public domain).
 
-Keeps aircraft whose registered owner is a law-enforcement agency. Output, one per line:
-ICAO hex address <TAB> N-number <TAB> owner <TAB> make and model
+Keeps aircraft whose registered owner is a law-enforcement agency ("police"), and aircraft a city,
+county or state government owns ("possible": often police, fire or rescue, sometimes not).
+Output, one per line:
+ICAO hex address <TAB> N-number <TAB> owner <TAB> make and model <TAB> police|possible
 """
 import csv
 import re
@@ -19,6 +21,10 @@ STRONG = re.compile(
 )
 # Broader names that only count when a government registered the aircraft.
 GOVERNMENT_ONLY = re.compile(r"\b(PUBLIC SAFETY|PATROL|DEPARTMENT OF JUSTICE|DEPT OF JUSTICE)\b")
+# Local and state governments: their aircraft are often police, fire or rescue.
+LOCAL_GOVERNMENT = re.compile(r"\b(CITY|COUNTY|TOWN|TOWNSHIP|VILLAGE|BOROUGH|PARISH|STATE OF|COMMONWEALTH OF|STATE)\b")
+# ...but not their schools, flight training or pest control.
+NOT_RESPONDERS = re.compile(r"\b(UNIVERSITY|COLLEGE|SCHOOL|ACADEMY|CAREER|INSTITUTE|MOSQUITO|VECTOR|EDUCATION)\b")
 
 
 def main(master, acftref):
@@ -32,13 +38,17 @@ def main(master, acftref):
         for row in csv.DictReader(f):
             name = " ".join(row["NAME"].split()).upper()
             government = row["TYPE REGISTRANT"].strip() == "5"
-            if not (STRONG.search(name) or (government and GOVERNMENT_ONLY.search(name))):
+            if STRONG.search(name) or (government and GOVERNMENT_ONLY.search(name)):
+                tier = "police"
+            elif government and LOCAL_GOVERNMENT.search(name) and not NOT_RESPONDERS.search(name):
+                tier = "possible"
+            else:
                 continue
             hexcode = row["MODE S CODE HEX"].strip().lower()
             if not re.fullmatch(r"[0-9a-f]{6}", hexcode):
                 continue
             model = models.get(row["MFR MDL CODE"].strip(), "")
-            out.append(f'{hexcode}\tN{row["N-NUMBER"].strip()}\t{name.title()}\t{model}')
+            out.append(f'{hexcode}\tN{row["N-NUMBER"].strip()}\t{name.title()}\t{model}\t{tier}')
     print("\n".join(sorted(set(out))))
 
 

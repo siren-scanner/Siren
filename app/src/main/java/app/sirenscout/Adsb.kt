@@ -15,7 +15,8 @@ object Adsb {
     private const val RADIUS_NM = 30
     private const val API = "https://api.adsb.lol/v2/point"
 
-    data class Registration(val tail: String, val owner: String, val model: String)
+    /** [police]: registered to a law-enforcement agency. Otherwise a city, county or state government owns it. */
+    data class Registration(val tail: String, val owner: String, val model: String, val police: Boolean = true)
 
     data class Aircraft(
         val hex: String,
@@ -37,7 +38,8 @@ object Adsb {
 
     fun parseRegistry(text: String): Map<String, Registration> = text.lineSequence().mapNotNull { line ->
         val f = line.split('\t')
-        if (f.size < 4 || f[0].length != 6) null else f[0].lowercase() to Registration(f[1], f[2], f[3])
+        if (f.size < 4 || f[0].length != 6) null
+        else f[0].lowercase() to Registration(f[1], f[2], f[3], police = f.getOrNull(4) != "possible")
     }.toMap()
 
     /** Every aircraft with a position in the feed's answer. */

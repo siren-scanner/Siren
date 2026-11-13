@@ -663,8 +663,9 @@ class ScanService : Service() {
                 me == null -> AirWatch.feedStatus.value = "Waiting for a location fix before checking for police aircraft."
                 else -> runCatching { Adsb.fetch(this@ScanService, me.latitude, me.longitude) }
                     .onSuccess { found ->
-                        val police = found.count { it.second != null }
-                        AirWatch.feedStatus.value = "Checked at $clock: ${found.size} aircraft within about 35 mi, $police of them law enforcement."
+                        val police = found.count { it.second?.police == true }
+                        val possible = found.count { it.second?.police == false }
+                        AirWatch.feedStatus.value = "Checked at $clock: ${found.size} aircraft within about 35 mi - $police law enforcement, $possible government (possible police / first responder)."
                         AirWatch.onAircraft(found, me.latitude, me.longitude, prefs.airAlertMiles * 1609.34, prefs.airShowAll)
                             .forEach { withContext(Dispatchers.Main) { notifyAir(it) } }
                     }
@@ -682,6 +683,7 @@ class ScanService : Service() {
         val title = when (c.kind) {
             AirContact.Kind.DRONE -> "Drone nearby"
             AirContact.Kind.AIRCRAFT, AirContact.Kind.OTHER_AIRCRAFT -> "Police aircraft nearby: ${c.title}"
+            AirContact.Kind.POSSIBLE_AIRCRAFT -> "Possible police / first-responder aircraft: ${c.title}"
         }
         val text = listOfNotNull(away, c.altitudeText, c.headingDeg?.let { "heading ${compass(it.toFloat())}" }).joinToString(" · ")
             .ifEmpty { c.detail }

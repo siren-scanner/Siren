@@ -26,7 +26,7 @@ data class AirContact(
     val firstSeen: Long,
     val lastSeen: Long,
 ) {
-    enum class Kind(val label: String) { DRONE("Drone"), AIRCRAFT("Police aircraft") }
+    enum class Kind(val label: String) { DRONE("Drone"), AIRCRAFT("Police aircraft"), OTHER_AIRCRAFT("Aircraft") }
 }
 
 /**
@@ -38,6 +38,9 @@ object AirWatch {
     private const val DRONE_TIMEOUT_MS = 60_000L
     private const val AIRCRAFT_TIMEOUT_MS = 120_000L
     const val REALERT_MS = 30 * 60_000L
+
+    /** How the last check of the aircraft feed went, shown in the Air tab. */
+    val feedStatus = MutableStateFlow("")
 
     private val _contacts = MutableStateFlow<Map<String, AirContact>>(emptyMap())
     val contacts: StateFlow<Map<String, AirContact>> = _contacts.asStateFlow()
@@ -86,24 +89,28 @@ object AirWatch {
     }
 
     /**
-     * The latest law-enforcement aircraft from the feed. Returns those within [alertWithinM] of you
-     * that should alert now.
+     * The latest aircraft from the feed: law-enforcement ones, plus every other aircraft if
+     * [showAll]. Returns the law-enforcement ones within [alertWithinM] of you that should alert now.
      */
     @Synchronized
     fun onAircraft(
-        found: List<Pair<Adsb.Aircraft, Adsb.Registration>>,
+        found: List<Pair<Adsb.Aircraft, Adsb.Registration?>>,
         meLat: Double?,
         meLon: Double?,
         alertWithinM: Double,
+        showAll: Boolean = false,
         now: Long = System.currentTimeMillis(),
     ): List<AirContact> {
-        val updated = found.map { (a, reg) ->
+        // Other aircraft are only shown while asked for; drop them as soon as that's switched off.
+        if (!showAll) _contacts.update { all -> all.filterValues { it.kind != AirContact.Kind.OTHER_AIRCRAFT } }
+        val updated = found.filter { (_, reg) -> reg != null || showAll }.map { (a, reg) ->
             val key = "aircraft|${a.hex}"
             AirContact(
                 key = key,
-                kind = AirContact.Kind.AIRCRAFT,
-                title = reg.owner,
-                detail = listOfNotNull(reg.model.ifEmpty { null }, reg.tail, a.callsign?.takeIf { it != reg.tail }).joinToString(" · "),
+                kind = if (reg != null) AirContact.Kind.AIRCRAFT else AirContact.Kind.OTHER_AIRCRAFT,
+                title = reg?.owner ?: a.callsign ?: a.hex.uppercase(),
+                detail = if (reg != null) listOfNotNull(reg.model.ifEmpty { null }, reg.tail, a.callsign?.takeIf { it != reg.tail }).joinToString(" · ")
+                else "not on the law-enforcement list",
                 lat = a.lat,
                 lon = a.lon,
                 altitudeText = if (a.onGround) "on the ground" else a.altitudeFt?.let { "%,d ft".format(it) },
@@ -116,7 +123,7 @@ object AirWatch {
         }
         _contacts.update { it + updated.associateBy { c -> c.key } }
         return updated.filter { c ->
-            val near = c.distanceM?.let { it <= alertWithinM } == true
+            val near = c.kind == AirContact.Kind.AIRCRAFT && c.distanceM?.let { it <= alertWithinM } == true
             near && c.altitudeText != "on the ground" && shouldAlert(c.key, now)
         }
     }

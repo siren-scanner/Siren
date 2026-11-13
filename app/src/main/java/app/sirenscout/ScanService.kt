@@ -657,13 +657,21 @@ class ScanService : Service() {
     private fun startAircraft() = scope.launch(Dispatchers.IO) {
         while (isActive) {
             val me = currentLocation()
-            if (prefs.airAircraft && me != null) {
-                runCatching { Adsb.fetchPolice(this@ScanService, me.latitude, me.longitude) }
+            val clock = java.time.LocalTime.now().withNano(0).withSecond(0)
+            when {
+                !prefs.airAircraft -> AirWatch.feedStatus.value = "Police aircraft check is off (Settings > Drones & aircraft)."
+                me == null -> AirWatch.feedStatus.value = "Waiting for a location fix before checking for police aircraft."
+                else -> runCatching { Adsb.fetch(this@ScanService, me.latitude, me.longitude) }
                     .onSuccess { found ->
-                        AirWatch.onAircraft(found, me.latitude, me.longitude, prefs.airAlertMiles * 1609.34)
+                        val police = found.count { it.second != null }
+                        AirWatch.feedStatus.value = "Checked at $clock: ${found.size} aircraft within about 35 mi, $police of them law enforcement."
+                        AirWatch.onAircraft(found, me.latitude, me.longitude, prefs.airAlertMiles * 1609.34, prefs.airShowAll)
                             .forEach { withContext(Dispatchers.Main) { notifyAir(it) } }
                     }
-                    .onFailure { AppLog.w("Police aircraft feed: ${it.javaClass.simpleName}") }
+                    .onFailure {
+                        AirWatch.feedStatus.value = "Couldn't reach the aircraft feed at $clock (${it.javaClass.simpleName}). Is mobile data on?"
+                        AppLog.w("Police aircraft feed: ${it.javaClass.simpleName}")
+                    }
             }
             delay(AIRCRAFT_POLL_MS)
         }
@@ -673,7 +681,7 @@ class ScanService : Service() {
         val away = c.distanceM?.let { formatShortDistance(it) + " away" }
         val title = when (c.kind) {
             AirContact.Kind.DRONE -> "Drone nearby"
-            AirContact.Kind.AIRCRAFT -> "Police aircraft nearby: ${c.title}"
+            AirContact.Kind.AIRCRAFT, AirContact.Kind.OTHER_AIRCRAFT -> "Police aircraft nearby: ${c.title}"
         }
         val text = listOfNotNull(away, c.altitudeText, c.headingDeg?.let { "heading ${compass(it.toFloat())}" }).joinToString(" · ")
             .ifEmpty { c.detail }

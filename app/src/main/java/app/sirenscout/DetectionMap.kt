@@ -371,8 +371,8 @@ private class AirLayer {
         val keys = air.mapTo(HashSet()) { it.key }
         for (gone in markers.keys - keys) markers.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
         for (gone in operators.keys - keys) operators.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
-        val color = AIR_COLOR.toArgb()
         for (c in air) {
+            val color = if (c.kind == AirContact.Kind.OTHER_AIRCRAFT) 0xFF9E9E9E.toInt() else AIR_COLOR.toArgb()
             if (c.lat != null && c.lon != null) {
                 val m = markers.getOrPut(c.key) {
                     Marker(map).apply {
@@ -382,12 +382,12 @@ private class AirLayer {
                     }
                 }
                 val pointing = c.headingDeg != null
-                if (m.icon == null || (m.relatedObject as? Boolean) != pointing) {
+                if (m.icon == null || m.relatedObject != (pointing to color)) {
                     m.icon = android.graphics.drawable.BitmapDrawable(
                         map.resources,
                         if (pointing) LocationMarker.arrow(map.context, color) else LocationMarker.dot(map.context, color),
                     )
-                    m.relatedObject = pointing
+                    m.relatedObject = pointing to color
                 }
                 m.rotation = -(c.headingDeg ?: 0.0).toFloat()
                 m.position = GeoPoint(c.lat, c.lon)

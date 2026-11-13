@@ -125,4 +125,14 @@ class AirTest {
         val other = Detection(Source.BLE, "AA:BB:CC:00:11:23", null, -70, null, 0, 0, 1, 0, -70, null, null, "Acme · speaker")
         assertEquals("Acme · speaker $GUESS_MARK", other.title)
     }
+
+    @Test
+    fun `other aircraft only show when asked for, and never alert`() {
+        AirWatch.clear()
+        val airliner = Adsb.Aircraft("a00002", "UAL995", 40.01, -100.0, 3000, 250.0, 90.0, onGround = false)
+        assertTrue(AirWatch.onAircraft(listOf(airliner to null), 40.0, -100.0, 8_000.0, showAll = true, now = 9_000_000L).isEmpty())
+        assertEquals("UAL995", AirWatch.contacts.value.getValue("aircraft|a00002").title)
+        AirWatch.onAircraft(listOf(airliner to null), 40.0, -100.0, 8_000.0, showAll = false, now = 9_030_000L)
+        assertTrue(AirWatch.contacts.value.isEmpty())
+    }
 }

@@ -480,6 +480,7 @@ private fun AirSettings() {
     val prefs = Prefs(context)
     var drones by remember { mutableStateOf(prefs.airDrones) }
     var aircraft by remember { mutableStateOf(prefs.airAircraft) }
+    var showAll by remember { mutableStateOf(prefs.airShowAll) }
     val unit = if (usesMiles()) 1f else 1.609f
     var miles by remember { mutableFloatStateOf(prefs.airAlertMiles) }
     androidx.compose.material3.Card {
@@ -522,5 +523,10 @@ private fun AirSettings() {
             "Police aircraft further away still show in the Air tab, up to about 35 miles (55 km).",
             style = MaterialTheme.typography.bodySmall, color = Color.Gray,
         )
+        SettingRow(
+            "Show all aircraft",
+            "Also list every other aircraft in the area, in grey and without alerts - handy to check the feed is working. Off: only law-enforcement aircraft.",
+            showAll,
+        ) { showAll = it; prefs.airShowAll = it }
     }
 }

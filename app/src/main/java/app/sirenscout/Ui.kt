@@ -157,6 +157,14 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             )
         }
         var showFlights by remember { mutableStateOf(false) }
+        var airTarget by remember { mutableStateOf<AirContact?>(null) }
+        airTarget?.let { c ->
+            AirDetailDialog(c, onClose = { airTarget = null }, onShowOnMap = { lat, lon, title ->
+                airTarget = null
+                showMap = true
+                MapFocus.pending.value = MapFocus.Request(c.key, lat, lon, title)
+            })
+        }
         if (showFlights) FlightsDialog(
             onClose = { showFlights = false },
             onShowOnMap = { lat, lon, title ->
@@ -280,7 +288,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (tab == Tab.AIR) "${air.size} drones / police aircraft · tap to see on the map"
+                        if (tab == Tab.AIR) "${air.size} drones / police aircraft · tap for details"
                         else "${shown.size} shown" + (if (everydayHidden > 0) " · $everydayHidden everyday hidden" else "") + " · tap for details, hold to hide",
                         style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.weight(1f),
                     )
@@ -348,7 +356,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                                 sourceRow()
                                 missingFix()
                             }
-                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = onMap, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
                         }
                     } else {
                         Column(
@@ -361,7 +369,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                             tabRow()
                             sourceRow()
                             missingFix()
-                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = onMap, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
                         }
                     }
                 }
@@ -391,12 +399,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                             )
                         }
                         items(air, key = { it.key }) { c ->
-                            AirRow(c, now, onClick = {
-                                if (c.lat != null && c.lon != null) {
-                                    showMap = true
-                                    MapFocus.pending.value = MapFocus.Request(c.key, c.lat, c.lon, c.title)
-                                }
-                            })
+                            AirRow(c, now, onClick = { airTarget = c })
                         }
                     } else {
                         item { sourceRow() }
@@ -408,7 +411,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
     } }
 }
 
-/** A drone or police aircraft in the Air tab. Tap to see it on the map. */
+/** A drone or police aircraft in the Air tab. Tap for its details. */
 @Composable
 private fun AirRow(c: AirContact, now: Long, onClick: () -> Unit) {
     Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
@@ -427,7 +430,7 @@ private fun AirRow(c: AirContact, now: Long, onClick: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 c.operatorLat?.let { _ ->
-                    Text("Operator position broadcast - tap to see it on the map", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    Text("Operator position broadcast - tap for details", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 }
                 Text(
                     (c.rssi?.let { "$it dBm · " } ?: "") + "seen ${((now - c.lastSeen) / 1000).coerceAtLeast(0)}s ago",

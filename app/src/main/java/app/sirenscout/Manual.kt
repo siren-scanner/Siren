@@ -250,7 +250,10 @@ private fun ManualContent() {
     Para(
         "New and not yet tested in the field - if you try it, you're a beta tester, and feedback is very welcome " +
             "(Settings > Drones & aircraft > Send feedback). Both show in the Air tab and on the map as purple arrows " +
-            "pointing where they're heading. Tap one in the Air tab to see it on the map."
+            "pointing where they're heading. Tap one in the Air tab, or tap its arrow on the map and then its bubble, for " +
+            "everything known about it - for aircraft, the live feed's full details (altitude, climb rate, speed, " +
+            "registration, type, owner) and Track & notify; for drones, everything its Remote ID said, including where the " +
+            "operator is."
     )
     Bullet("Drones: most drones must broadcast Remote ID - their serial number, position, height, speed and often where their operator is standing - over Bluetooth and Wi-Fi. Siren hears it directly, with no internet, typically within a few hundred metres to a mile. The operator's broadcast position shows on the map as a grey dot. The drone's own Bluetooth or Wi-Fi signal also appears in All nearby, labelled Drone (Remote ID) - identified, not a guess, so the on-device AI doesn't look at it.")
     Bullet("Remote ID doesn't say who owns a drone, so every drone is listed. The serial number and model are your best clue: Skydio, BRINC and \"drone as first responder\" programs are mostly police and fire. Small drones under 250 g and some agencies with FAA waivers don't broadcast.")

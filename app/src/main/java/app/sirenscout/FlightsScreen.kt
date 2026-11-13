@@ -286,3 +286,94 @@ private fun FlightCard(f: LiveFlight, from: Airport?, to: Airport?, onShowOnMap:
         }
     }
 }
+
+/** Everything known about a drone or aircraft from the map or the Air tab. */
+@Composable
+fun AirDetailDialog(c: AirContact, onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, title: String) -> Unit) {
+    val context = LocalContext.current
+    val hex = when {
+        c.key.startsWith("aircraft|") -> c.key.substringAfter('|')
+        c.key.startsWith("flight|") -> Flights.live.collectAsStateWithLifecycle().value[c.key.substringAfter('|')]?.hex
+        else -> null
+    }
+    // Aircraft: the live feed's full picture, refreshed while open.
+    val live by androidx.compose.runtime.produceState<LiveFlight?>(null, hex) {
+        while (hex != null) {
+            runCatching { withContext(Dispatchers.IO) { Flights.lookupHex(context, hex) } }.getOrNull()?.let { value = it }
+            delay(15_000)
+        }
+    }
+    val registration = remember(hex) { hex?.let { Adsb.registrations(context)[it] } }
+    var tracked by remember { mutableStateOf(false) }
+
+    FullScreenPage(onDismiss = onClose) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Column(Modifier.safeDrawingPadding()) {
+                Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(c.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    TextButton(onClick = onClose) { Text("Close") }
+                }
+                HorizontalDivider()
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()).padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 48.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(c.kind.label, style = MaterialTheme.typography.titleSmall, color = airColor(c.kind))
+                    registration?.let { r ->
+                        Text(
+                            "Registered to ${r.owner}" + if (r.police) " - a law-enforcement agency." else
+                                " - a city, county or state government, so possibly police, fire or rescue.",
+                        )
+                        Text(listOf(r.tail, r.model).filter { it.isNotEmpty() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    if (hex != null) {
+                        val f = live
+                        if (f != null) FlightCard(f, null, null, onShowOnMap)
+                        else Text("Getting the latest from the feed…", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Button(
+                            onClick = {
+                                val query = f?.callsign?.trim()?.takeIf { it.isNotEmpty() } ?: hex.uppercase()
+                                val today = Flights.tripDay()
+                                Flights.track(context, TrackedFlight(query, startDay = today, endDay = today))
+                                tracked = true
+                            },
+                            enabled = !tracked && c.kind != AirContact.Kind.TRACKED_FLIGHT,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (tracked) "Tracking - see Air tab > Search & track flights" else "Track & notify") }
+                    } else {
+                        // A drone: what its Remote ID said.
+                        val miles = usesMiles()
+                        listOfNotNull(
+                            c.detail,
+                            c.altitudeText,
+                            c.speedMs?.let { if (miles) "%.0f mph".format(it * 2.23694) else "%.0f km/h".format(it * 3.6) },
+                            c.headingDeg?.let { "heading ${compass(it.toFloat())} (%.0f°)".format(it) },
+                            c.distanceM?.let { formatShortDistance(it) + " from you" },
+                            c.rssi?.let { "signal $it dBm (${proximity(it)})" },
+                        ).forEach { Text(it) }
+                        if (c.operatorLat != null && c.operatorLon != null) {
+                            val fromDrone = if (c.lat != null && c.lon != null) " · " + formatShortDistance(Odometer.distanceM(c.lat, c.lon, c.operatorLat, c.operatorLon)) + " from the drone" else ""
+                            Text(
+                                "Operator at %.5f, %.5f$fromDrone · tap to show on the map".format(c.operatorLat, c.operatorLon),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable { onShowOnMap(c.operatorLat, c.operatorLon, "Drone operator") },
+                            )
+                        }
+                        Text(
+                            "Remote ID doesn't say who owns a drone. The serial number and model are the best clue: Skydio, BRINC and " +
+                                "\"drone as first responder\" programs are mostly police and fire.",
+                            style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                        )
+                    }
+                    if (c.lat != null && c.lon != null) {
+                        OutlinedButton(onClick = { onShowOnMap(c.lat, c.lon, c.title) }, modifier = Modifier.fillMaxWidth()) { Text("Show on map") }
+                    }
+                    Text(
+                        "First seen ${((System.currentTimeMillis() - c.firstSeen) / 60_000)} min ago",
+                        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                    )
+                }
+            }
+        }
+    }
+}

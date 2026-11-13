@@ -80,6 +80,7 @@ fun DetectionMap(
     detections: List<Detection>,
     modifier: Modifier = Modifier,
     air: List<AirContact> = emptyList(),
+    onAirDetails: (AirContact) -> Unit = {},
     onDetails: (Detection) -> Unit = {},
     onHide: (Detection) -> Unit = {},
 ) {
@@ -97,6 +98,7 @@ fun DetectionMap(
     val cameras by KnownCameras.cameras.collectAsStateWithLifecycle()
     val cameraLayer = remember { CameraLayer() }
     val airLayer = remember { AirLayer() }
+    airLayer.onDetails = onAirDetails
     var hasLocation by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -364,6 +366,22 @@ private fun PinCard(d: Detection, onDetails: () -> Unit, onHide: () -> Unit, onC
 private class AirLayer {
     private val markers = HashMap<String, Marker>()
     private val operators = HashMap<String, Marker>()
+    private val latest = HashMap<String, AirContact>()
+    /** Tapping a drone's or aircraft's bubble opens everything known about it. */
+    var onDetails: (AirContact) -> Unit = {}
+
+    /** The usual bubble, but tapping it opens the details instead of just closing it. */
+    private inner class DetailsBubble(map: MapView, private val key: String) :
+        org.osmdroid.views.overlay.infowindow.MarkerInfoWindow(org.osmdroid.library.R.layout.bonuspack_bubble, map) {
+        override fun onOpen(item: Any?) {
+            super.onOpen(item)
+            view.setOnTouchListener(null)
+            view.setOnClickListener {
+                close()
+                latest[key]?.let(onDetails)
+            }
+        }
+    }
 
     fun marker(key: String): Marker? = markers[key]
 
@@ -371,6 +389,8 @@ private class AirLayer {
         val keys = air.mapTo(HashSet()) { it.key }
         for (gone in markers.keys - keys) markers.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
         for (gone in operators.keys - keys) operators.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
+        latest.clear()
+        air.associateByTo(latest) { it.key }
         for (c in air) {
             val color = airColor(c.kind).toArgb()
             if (c.lat != null && c.lon != null) {
@@ -378,6 +398,7 @@ private class AirLayer {
                     Marker(map).apply {
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         isFlat = true // turns with the map
+                        infoWindow = DetailsBubble(map, c.key)
                         map.overlays.add(this)
                     }
                 }
@@ -393,6 +414,7 @@ private class AirLayer {
                 m.position = GeoPoint(c.lat, c.lon)
                 m.title = c.kind.label + ": " + c.title
                 m.snippet = listOfNotNull(c.detail, c.altitudeText, c.distanceM?.let { formatShortDistance(it) + " away" }).joinToString("<br>")
+                m.subDescription = "Tap for everything known about it"
             }
             if (c.operatorLat != null && c.operatorLon != null) {
                 val op = operators.getOrPut(c.key) {

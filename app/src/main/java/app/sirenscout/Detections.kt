@@ -44,13 +44,21 @@ data class Detection(
         }
 
     /** Shown in lists: the signature, the broadcast name, or failing those a marked guess. */
-    val title get() = signature?.label ?: if (isTesla) TeslaKey.LABEL else name ?: guess?.let { "$it $GUESS_MARK" } ?: "Unknown device"
+    val title get() = signature?.label ?: if (isTesla) TeslaKey.LABEL else name ?: guess?.let(::markGuess) ?: "Unknown device"
 
     /** The guess as a secondary line, when it isn't already the title. */
-    val guessLine get() = guess?.takeIf { (signature != null || name != null) && !isTesla }?.let { "$it $GUESS_MARK" }
+    val guessLine get() = guess?.takeIf { (signature != null || name != null) && !isTesla }?.let(::markGuess)
 
     /** A Tesla's phone-key signal: certain from its name, so shown as "Tesla car key" without a guess mark. */
     val isTesla get() = TeslaKey.isTesla(name)
+
+    /** A drone sending Remote ID: known from what it broadcasts, so not a guess. Its position is in the Air tab. */
+    val isDrone get() = guess == RemoteId.LABEL
+
+    /** Identified from what it broadcasts rather than guessed: no (UNK), and the AI isn't asked. */
+    val isIdentified get() = isTesla || isDrone
+
+    private fun markGuess(g: String) = if (isIdentified) g else "$g $GUESS_MARK"
 
     val key get() = "${source.name}|$id"
     /** Identifies this encounter; the same device seen again after a gap gets a new one. */

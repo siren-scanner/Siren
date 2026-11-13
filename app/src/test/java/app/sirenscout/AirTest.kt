@@ -115,4 +115,14 @@ class AirTest {
         assertTrue(c.detail.contains("XYZ"))
         assertEquals(111.0, c.distanceM!!, 2.0)
     }
+
+    @Test
+    fun `a drone's own signal is labelled, not guessed, and the AI leaves it alone`() {
+        val d = Detection(Source.BLE, "AA:BB:CC:00:11:22", null, -70, null, 0, 0, 1, 0, -70, null, null, RemoteId.LABEL)
+        assertEquals("Drone (Remote ID)", d.title)
+        assertTrue(d.isIdentified)
+        assertTrue(AiGuesser.candidates(listOf(d), emptyMap(), Hidden.Rules()).isEmpty())
+        val other = Detection(Source.BLE, "AA:BB:CC:00:11:23", null, -70, null, 0, 0, 1, 0, -70, null, null, "Acme · speaker")
+        assertEquals("Acme · speaker $GUESS_MARK", other.title)
+    }
 }

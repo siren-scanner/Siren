@@ -188,7 +188,11 @@ fun DetailDialog(
                     d.reason?.let { Info("Why it matched", it) }
                     sig?.let { Info("Category", "${it.category.label} · ${it.confidence.name.lowercase(Locale.US)} confidence") }
                     d.name?.let { Info("Broadcast name", it) }
-                    d.guess?.takeIf { !d.isTesla }?.let { Info("Guess", "$it $GUESS_MARK") }
+                    when {
+                        d.isDrone -> Info("Identified", "${RemoteId.LABEL} - its position, height and operator are in the Air tab")
+                        d.isTesla -> {}
+                        else -> d.guess?.let { Info("Guess", "$it $GUESS_MARK") }
+                    }
                     AiGuesser.lookup(d)?.let { ai ->
                         Info("On-device AI's guess", "${ai.label} ${AiGuesser.MARK} · ${ai.category.replace('_', ' ')}, ${ai.confidence} confidence")
                         Info("AI's reasoning", ai.why)

@@ -14,8 +14,8 @@ android {
         applicationId = "app.sirenscout"
         minSdk = 26
         targetSdk = 35
-        versionCode = 55
-        versionName = "1.0.53"
+        versionCode = 56
+        versionName = "1.0.54"
     }
 
     // Private settings for the maintainer's own builds, kept out of the shared code: the self-update
@@ -57,7 +57,9 @@ android {
     //  - "foss" is the open-source edition built by F-Droid: no Google libraries, no self-updates.
     flavorDimensions += "channel"
     defaultConfig {
-        buildConfigField("String", "REPO_URL", "\"$repoUrl\"")
+        // Only the public (foss) edition links to the project page for suggestions; the
+        // maintainer's own builds have no feedback buttons.
+        buildConfigField("String", "REPO_URL", "\"\"")
         buildConfigField("String", "AUTHOR", "\"$author\"")
     }
     productFlavors {
@@ -85,6 +87,7 @@ android {
             resValue("string", "app_name", "Siren")
             buildConfigField("String", "UPDATE_URL", "\"\"")
             buildConfigField("String", "UPDATE_FALLBACK_URL", "\"\"")
+            buildConfigField("String", "REPO_URL", "\"$repoUrl\"")
             buildConfigField("int", "CAR_PORT", "8082")
             buildConfigField("boolean", "TEST_BUILD", "false")
         }

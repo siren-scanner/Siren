@@ -439,6 +439,7 @@ private fun SuggestButtons() {
 /** Radio monitoring hasn't been tried with a real dongle yet: say so, and ask for feedback. */
 @Composable
 private fun RfBetaNote() {
+    if (BuildConfig.REPO_URL.isEmpty()) return // only the public edition asks testers for feedback
     val context = LocalContext.current
     androidx.compose.material3.Card {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -483,7 +484,7 @@ private fun AirSettings() {
     var showAll by remember { mutableStateOf(prefs.airShowAll) }
     val unit = if (usesMiles()) 1f else 1.609f
     var miles by remember { mutableFloatStateOf(prefs.airAlertMiles) }
-    androidx.compose.material3.Card {
+    if (BuildConfig.REPO_URL.isNotEmpty()) androidx.compose.material3.Card {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Beta: new and not yet tested in the field", style = MaterialTheme.typography.titleSmall)
             Text(

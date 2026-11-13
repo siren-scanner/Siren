@@ -279,6 +279,37 @@ object Flights {
     private fun minutesTo(meters: Double, speedKt: Double?): Int? =
         speedKt?.takeIf { it > 50 }?.let { (meters / (it * 0.514444) / 60).toInt() }
 
+    // ---- Recent searches ----------------------------------------------------------------------
+
+    /** A flight the user looked up, with the airports they entered. */
+    data class Search(val query: String, val from: String, val to: String)
+
+    private const val MAX_RECENT = 10
+
+    /** Most recent first. */
+    fun recent(context: Context): List<Search> = runCatching {
+        val a = JSONArray(prefs(context).getString("recent", "[]"))
+        List(a.length()) { a.getJSONObject(it) }.map { Search(it.getString("query"), it.optString("from"), it.optString("to")) }
+    }.getOrDefault(emptyList())
+
+    /** Puts [s] at the top of the recent searches (replacing an older search for the same flight). */
+    fun remember(context: Context, s: Search): List<Search> {
+        val list = (listOf(s) + recent(context).filterNot { it.query.equals(s.query, ignoreCase = true) }).take(MAX_RECENT)
+        saveRecent(context, list)
+        return list
+    }
+
+    fun forget(context: Context, query: String): List<Search> =
+        recent(context).filterNot { it.query.equals(query, ignoreCase = true) }.also { saveRecent(context, it) }
+
+    fun clearRecent(context: Context) = saveRecent(context, emptyList())
+
+    private fun saveRecent(context: Context, list: List<Search>) = prefs(context).edit()
+        .putString("recent", JSONArray(list.map { JSONObject().put("query", it.query).put("from", it.from).put("to", it.to) }).toString())
+        .apply()
+
+    private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("flights", Context.MODE_PRIVATE)
+
     // ---- The user's tracked flights ----------------------------------------------------------
 
     private val _tracked = MutableStateFlow<List<TrackedFlight>>(emptyList())

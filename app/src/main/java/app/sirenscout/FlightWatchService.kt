@@ -55,7 +55,16 @@ class FlightWatchService : Service() {
                 getSystemService(LocationManager::class.java)?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             }.getOrNull()
             var seen = 0
-            for (t in Flights.tracked.value) {
+            val today = Flights.tripDay()
+            val active = Flights.tracked.value.filter { Flights.isActive(it, today) }
+            for (t0 in active) {
+                var t = t0
+                if (t.startDay.isNotEmpty() && "$today:today" !in t.notified) {
+                    // A new day for a flight expected on several days: say so, and start its story afresh.
+                    post(Flights.Update("$today:today", "${t.id} is expected today", "Siren will tell you when it shows up, takes off and lands."))
+                    t = t.copy(notified = t.notified.filter { it.startsWith(today) }.toSet() + "$today:today", phase = "", lastSeenAt = 0)
+                    Flights.save(this, Flights.tracked.value.map { if (it.id == t.id) t else it })
+                }
                 val live = runCatching { Flights.lookup(this, t.query) }.getOrElse {
                     AppLog.w("Flight ${t.query}: ${it.javaClass.simpleName}")
                     continue // network trouble: try again next round, without calling it "lost"
@@ -68,11 +77,19 @@ class FlightWatchService : Service() {
                 Flights.save(this, Flights.tracked.value.map { if (it.id == t.id) next else it })
                 updates.forEach(::post)
             }
-            val n = Flights.tracked.value.size
+            val n = active.size
+            val next = Flights.tracked.value.filter { it.startDay > today }.minByOrNull { it.startDay }
             NotificationManagerCompat.from(this).runCatching {
-                notify(ONGOING_ID, ongoing("Tracking $n flight${if (n == 1) "" else "s"} · $seen in the air or on the feed"))
+                notify(
+                    ONGOING_ID,
+                    ongoing(
+                        if (n > 0) "Tracking $n flight${if (n == 1) "" else "s"} today · $seen on the feed"
+                        else next?.let { "Next: ${it.id} on ${it.daysText}" } ?: "Waiting for your flights' days"
+                    ),
+                )
             }
-            delay(POLL_MS)
+            // Between flight days, just look in now and then for the next day to start.
+            delay(if (n > 0) POLL_MS else IDLE_MS)
         }
         running = false
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -116,6 +133,7 @@ class FlightWatchService : Service() {
         private const val ONGOING_ID = 5000
         private const val UPDATE_ID_BASE = 5100
         private const val POLL_MS = 60_000L
+        private const val IDLE_MS = 15 * 60_000L
         @Volatile private var running = false
 
         /** Starts following tracked flights, if there are any. Call from the foreground (the app screen). */

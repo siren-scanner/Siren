@@ -29,7 +29,7 @@ class FlightsTest {
         fun step(f: LiveFlight?, now: Long): List<String> {
             val (u, next) = Flights.updates(t, f, dfw, jfk, null, null, now)
             t = next
-            return u.map { it.key }
+            return u.map { it.key.substringAfter(':') }
         }
         assertEquals(listOf("found"), step(live(null, 0, ground = true, speed = 10.0), 0))
         assertEquals(listOf("takeoff"), step(live(3_000, 2_500, speed = 220.0), 60_000))
@@ -44,7 +44,7 @@ class FlightsTest {
     fun `emergencies and lost signal are reported`() {
         var t = TrackedFlight("AA100", phase = "cruising", lastSeenAt = 0)
         val (u1, t1) = Flights.updates(t, live(35_000, 0).copy(emergency = "general", squawk = "7700"), null, null, null, null, 1_000)
-        assertTrue(u1.any { it.key == "emergency-general" && it.title.contains("EMERGENCY") })
+        assertTrue(u1.any { it.key.endsWith(":emergency-general") && it.title.contains("EMERGENCY") })
         t = t1
         val (u2, _) = Flights.updates(t, null, null, null, null, null, 1_000 + 11 * 60_000L)
         assertTrue(u2.any { it.title.contains("signal lost") })
@@ -56,5 +56,32 @@ class FlightsTest {
         assertEquals("KJFK", all.getValue("JFK").icao)
         assertEquals("JFK", all.getValue("KJFK").iata)
         assertTrue(all.size > 6_000)
+    }
+
+    @Test
+    fun `flights with dates are only followed on their days, afresh each day`() {
+        val t = TrackedFlight("AA100", startDay = "2026-11-15", endDay = "2026-11-17")
+        assertTrue(!Flights.isActive(t, "2026-11-14"))
+        assertTrue(Flights.isActive(t, "2026-11-15"))
+        assertTrue(Flights.isActive(t, "2026-11-17"))
+        assertTrue(!Flights.isActive(t, "2026-11-18"))
+        assertTrue(Flights.isActive(TrackedFlight("AA100"), "2030-01-01"))
+        assertEquals("Sun Nov 15 – Tue Nov 17", t.daysText)
+
+        // The same status is reported again on the next day.
+        val zone = java.time.ZoneId.systemDefault()
+        val day1 = java.time.LocalDateTime.of(2026, 11, 15, 12, 0).atZone(zone).toInstant().toEpochMilli()
+        val day2 = day1 + 24 * 3_600_000L
+        val (u1, t1) = Flights.updates(t, live(null, 0, ground = true, speed = 5.0), null, null, null, null, day1)
+        val (u2, _) = Flights.updates(t1, live(null, 0, ground = true, speed = 5.0), null, null, null, null, day2)
+        assertEquals(listOf("2026-11-15:found"), u1.map { it.key })
+        assertEquals(listOf("2026-11-16:found"), u2.map { it.key })
+    }
+
+    @Test
+    fun `a late flight still counts as the day it was expected`() {
+        val zone = java.time.ZoneId.systemDefault()
+        val halfPastMidnight = java.time.LocalDateTime.of(2026, 11, 16, 0, 30).atZone(zone).toInstant().toEpochMilli()
+        assertEquals("2026-11-15", Flights.tripDay(halfPastMidnight))
     }
 }

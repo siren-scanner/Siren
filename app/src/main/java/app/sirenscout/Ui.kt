@@ -161,7 +161,26 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             )
         }
         var showFlights by remember { mutableStateOf(false) }
+        var flightToOpen by remember { mutableStateOf<String?>(null) }
         var airTarget by remember { mutableStateOf<AirContact?>(null) }
+        // A tapped notification opens what it was about.
+        val link by DeepLink.pending.collectAsStateWithLifecycle()
+        LaunchedEffect(link) {
+            val l = link ?: return@LaunchedEffect
+            DeepLink.pending.value = null
+            showSettings = false
+            when (l) {
+                is DeepLink.Device -> (Detections.items.value[l.key] ?: history.lastOrNull { it.key == l.key })?.let { detailTarget = it }
+                is DeepLink.Air -> airTarget = AirWatch.contacts.value[l.key] ?: AirContact(
+                    key = l.key,
+                    kind = if (l.key.startsWith("drone|")) AirContact.Kind.DRONE else AirContact.Kind.AIRCRAFT,
+                    title = l.title, detail = "No longer in range - showing the latest from the feed", lat = null, lon = null,
+                    altitudeText = null, speedMs = null, headingDeg = null, firstSeen = now, lastSeen = now,
+                )
+                is DeepLink.Flight -> { flightToOpen = l.id; showFlights = true }
+                is DeepLink.Place -> { showMap = true; MapFocus.pending.value = MapFocus.Request("place|${l.title}", l.lat, l.lon, l.title) }
+            }
+        }
         airTarget?.let { c ->
             AirDetailDialog(c, onClose = { airTarget = null }, onShowOnMap = { lat, lon, title ->
                 airTarget = null
@@ -170,7 +189,8 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             })
         }
         if (showFlights) FlightsDialog(
-            onClose = { showFlights = false },
+            initialFlight = flightToOpen,
+            onClose = { showFlights = false; flightToOpen = null },
             onShowOnMap = { lat, lon, title ->
                 showFlights = false
                 showMap = true

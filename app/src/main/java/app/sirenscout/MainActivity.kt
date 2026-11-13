@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
         LocationMarker.init(this)
         AiGuesser.init(this)
         Flights.load(this)
+        DeepLink.handle(intent)
         FlightWatchService.start(this) // picks up flights tracked before Siren was closed
         // On-device AI is only allowed while the app is on screen, so tie it to the resumed state.
         lifecycleScope.launch {
@@ -75,6 +76,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             SirenScoutApp(onStart = ::requestStart, onStop = ::stopScanning)
         }
+    }
+
+    /** A notification tapped while Siren is already open. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        DeepLink.handle(intent)
     }
 
     override fun onResume() {

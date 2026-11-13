@@ -182,7 +182,8 @@ class ScanService : Service() {
     private fun onBle(r: ScanResult) {
         ScanHealth.ble()
         val record = r.scanRecord
-        record?.serviceData?.get(REMOTE_ID_UUID)?.let { data -> onRemoteId(r.device.address, r.rssi) { RemoteId.fromBle(data, it) } }
+        val droneData = record?.serviceData?.get(REMOTE_ID_UUID)?.takeIf { RemoteId.fromBle(it) != null }
+        droneData?.let { data -> onRemoteId(r.device.address, r.rssi) { RemoteId.fromBle(data, it) } }
         val name = record?.deviceName ?: runCatching { r.device.name }.getOrNull()
         val manufacturer = record?.manufacturerSpecificData?.let { d -> (0 until d.size()).associate { d.keyAt(it) to d.valueAt(it) } }.orEmpty()
         val services = (record?.serviceUuids.orEmpty() + record?.serviceData?.keys.orEmpty())
@@ -192,7 +193,9 @@ class ScanService : Service() {
             record?.serviceData.orEmpty().mapNotNull { (k, v) -> DeviceGuesser.uuid16(k)?.let { it to v } }.toMap(),
             record?.serviceUuids.orEmpty().mapNotNull(DeviceGuesser::uuid16).toSet(),
         )
-        sighting(Source.BLE, r.device.address, name, r.rssi, manufacturer.keys.toList(), services, tracker, DeviceGuesser.summary(r)) { TeslaKey.guess(name) ?: DeviceGuesser.ble(r) }
+        sighting(Source.BLE, r.device.address, name, r.rssi, manufacturer.keys.toList(), services, tracker, DeviceGuesser.summary(r)) {
+            TeslaKey.guess(name) ?: (if (droneData != null) RemoteId.LABEL else null) ?: DeviceGuesser.ble(r)
+        }
     }
 
     /** Wakes the BLE loop to restart the scan right away, e.g. when the finder opens or closes. */
@@ -335,15 +338,18 @@ class ScanService : Service() {
             @Suppress("DEPRECATION")
             val ssid = r.SSID?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }
             val bssid = r.BSSID ?: continue
+            var drone = false
             if (Build.VERSION.SDK_INT >= 30) {
                 // Drones can also send Remote ID inside Wi-Fi beacons, as a vendor-specific element.
                 for (e in r.informationElements) {
                     if (e.id != 221) continue
                     val bytes = ByteArray(e.bytes.remaining()).also { e.bytes.duplicate().get(it) }
+                    if (RemoteId.fromWifiElement(bytes) == null) continue
+                    drone = true
                     onRemoteId(bssid, r.level) { RemoteId.fromWifiElement(bytes, it) }
                 }
             }
-            sighting(Source.WIFI, bssid, ssid, r.level) { DeviceGuesser.wifi(bssid, ssid) }
+            sighting(Source.WIFI, bssid, ssid, r.level) { if (drone) RemoteId.LABEL else DeviceGuesser.wifi(bssid, ssid) }
         }
         Detections.setStatus { it.copy(wifi = "${fresh.size} networks in range · every ${wifiEverySeconds}s") }
     }

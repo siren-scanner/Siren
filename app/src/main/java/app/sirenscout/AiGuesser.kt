@@ -80,7 +80,7 @@ object AiGuesser {
         guesses.value = emptyMap()
     }
 
-    fun lookup(d: Detection): AiGuess? = if (d.signature != null || TeslaKey.isTesla(d.name)) null else guesses.value[key(d)]
+    fun lookup(d: Detection): AiGuess? = if (d.signature != null || d.isIdentified) null else guesses.value[key(d)]
 
     /**
      * Groups devices that look alike: numbers in names are wildcarded ("Unit 14" ~ "Unit 15"),
@@ -98,7 +98,7 @@ object AiGuesser {
     /** Devices worth asking about: unidentified, not hidden, with something to go on. */
     fun candidates(items: Collection<Detection>, known: Map<String, AiGuess>, hidden: Hidden.Rules): List<Detection> =
         items.asSequence()
-            .filter { it.signature == null && it.source != Source.RF && !hidden.hides(it) && !TeslaKey.isTesla(it.name) }
+            .filter { it.signature == null && it.source != Source.RF && !hidden.hides(it) && !it.isIdentified }
             .filter { it.name != null || it.adSummary != null || it.guess != null }
             .distinctBy(::key)
             .filter { key(it) !in known }

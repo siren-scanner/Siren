@@ -8,6 +8,8 @@ package app.sirenscout
  */
 object RemoteId {
     const val BLE_SERVICE_UUID = "0000fffa-0000-1000-8000-00805f9b34fb"
+    /** How a device sending Remote ID is labelled in the lists: certain, so no (UNK). */
+    const val LABEL = "Drone (Remote ID)"
     private const val APP_CODE = 0x0D
     private const val MESSAGE_SIZE = 25
 

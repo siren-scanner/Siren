@@ -529,7 +529,7 @@ private fun DetectionRow(d: Detection, now: Long, onClick: () -> Unit, onLongCli
 
 @Composable
 internal fun HideDialog(d: Detection, onDismiss: () -> Unit) {
-    val title = if (d.isTesla) TeslaKey.LABEL else d.name ?: d.signature?.label ?: d.guess?.let { "$it $GUESS_MARK" } ?: d.id
+    val title = if (d.isTesla) TeslaKey.LABEL else d.name ?: d.signature?.label ?: d.guess?.let { if (d.isIdentified) it else "$it $GUESS_MARK" } ?: d.id
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Hide $title?") },

@@ -43,14 +43,20 @@ import kotlinx.coroutines.withContext
 /** Look up any flight by number, callsign or tail number, see everything the feed knows, and track it. */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun FlightsDialog(onClose: () -> Unit, onShowOnMap: (lat: Double, lon: Double, title: String) -> Unit) {
+fun FlightsDialog(
+    onClose: () -> Unit,
+    onShowOnMap: (lat: Double, lon: Double, title: String) -> Unit,
+    /** Open on this tracked flight (from a notification) instead of the last search. */
+    initialFlight: String? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // The last search stays in the boxes when you come back.
     var recent by remember { mutableStateOf(Flights.recent(context)) }
-    var query by remember { mutableStateOf(recent.firstOrNull()?.query.orEmpty()) }
-    var from by remember { mutableStateOf(recent.firstOrNull()?.from.orEmpty()) }
-    var to by remember { mutableStateOf(recent.firstOrNull()?.to.orEmpty()) }
+    val opening = initialFlight?.let { id -> Flights.tracked.value.firstOrNull { it.id == id } ?: TrackedFlight(id) }
+    var query by remember { mutableStateOf(opening?.query ?: recent.firstOrNull()?.query.orEmpty()) }
+    var from by remember { mutableStateOf(opening?.from ?: recent.firstOrNull()?.from.orEmpty()) }
+    var to by remember { mutableStateOf(opening?.to ?: recent.firstOrNull()?.to.orEmpty()) }
     var firstDay by remember { mutableStateOf(java.time.LocalDate.parse(Flights.tripDay())) }
     var lastDay by remember { mutableStateOf(firstDay) }
     /** Which date is being picked: "first" or "last". */

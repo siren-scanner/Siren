@@ -61,7 +61,7 @@ class FlightWatchService : Service() {
                 var t = t0
                 if (t.startDay.isNotEmpty() && "$today:today" !in t.notified) {
                     // A new day for a flight expected on several days: say so, and start its story afresh.
-                    post(Flights.Update("$today:today", "${t.id} is expected today", "Siren will tell you when it shows up, takes off and lands."))
+                    post(Flights.Update("$today:today", "${t.id} is expected today", "Siren will tell you when it shows up, takes off and lands."), t.id)
                     t = t.copy(notified = t.notified.filter { it.startsWith(today) }.toSet() + "$today:today", phase = "", lastSeenAt = 0)
                     Flights.save(this, Flights.tracked.value.map { if (it.id == t.id) t else it })
                 }
@@ -75,7 +75,7 @@ class FlightWatchService : Service() {
                     t, live, Airports.find(this, t.from), Airports.find(this, t.to), me?.latitude, me?.longitude,
                 )
                 Flights.save(this, Flights.tracked.value.map { if (it.id == t.id) next else it })
-                updates.forEach(::post)
+                updates.forEach { post(it, t.id) }
             }
             val n = active.size
             val next = Flights.tracked.value.filter { it.startDay > today }.minByOrNull { it.startDay }
@@ -96,7 +96,7 @@ class FlightWatchService : Service() {
         stopSelf()
     }
 
-    private fun post(u: Flights.Update) {
+    private fun post(u: Flights.Update, flightId: String) {
         AlertSound.play(this, AlertSound.Kind.AIR)
         val n = NotificationCompat.Builder(this, CH_UPDATES)
             .setSmallIcon(R.drawable.ic_stat_siren)
@@ -104,7 +104,7 @@ class FlightWatchService : Service() {
             .setContentText(u.text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(u.text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(openApp())
+            .setContentIntent(DeepLink.intent(this, DeepLink.Flight(flightId)))
             .setAutoCancel(true)
             .build()
         runCatching { NotificationManagerCompat.from(this).notify(UPDATE_ID_BASE + Math.floorMod(u.title.hashCode(), 1000), n) }

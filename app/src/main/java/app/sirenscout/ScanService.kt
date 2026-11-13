@@ -128,10 +128,12 @@ class ScanService : Service() {
         startClassic()
         startWifi()
         startRf()
+        startAircraft()
         scope.launch {
             while (isActive) {
                 delay(30_000)
                 Detections.prune()
+                AirWatch.prune()
                 withContext(Dispatchers.Main) {
                     followDetector.prune(System.currentTimeMillis())
                     trackerDetector.prune(System.currentTimeMillis())
@@ -180,6 +182,7 @@ class ScanService : Service() {
     private fun onBle(r: ScanResult) {
         ScanHealth.ble()
         val record = r.scanRecord
+        record?.serviceData?.get(REMOTE_ID_UUID)?.let { data -> onRemoteId(r.device.address, r.rssi) { RemoteId.fromBle(data, it) } }
         val name = record?.deviceName ?: runCatching { r.device.name }.getOrNull()
         val manufacturer = record?.manufacturerSpecificData?.let { d -> (0 until d.size()).associate { d.keyAt(it) to d.valueAt(it) } }.orEmpty()
         val services = (record?.serviceUuids.orEmpty() + record?.serviceData?.keys.orEmpty())
@@ -202,7 +205,10 @@ class ScanService : Service() {
             // Finding a device always gets the fastest mode, whatever the battery.
             val mode = if (Detections.finding.value != null) ScanSettings.SCAN_MODE_LOW_LATENCY
             else AutoTune.bleScanMode(this@ScanService, prefs)
-            val settings = ScanSettings.Builder().setScanMode(mode).build()
+            val settings = ScanSettings.Builder().setScanMode(mode).apply {
+                // Also hear Bluetooth 5 long-range broadcasts, which many drones use for Remote ID.
+                if (btAdapter?.isLeCodedPhySupported == true) setLegacy(false).setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
+            }.build()
             val scanner = btAdapter?.takeIf { it.isEnabled }?.bluetoothLeScanner
             if (scanner == null) {
                 Detections.setStatus { it.copy(ble = "Bluetooth is off") }
@@ -249,6 +255,7 @@ class ScanService : Service() {
             add(ScanFilter.Builder().setServiceData(uuid, ByteArray(0)).build())
         }
         for (name in SCREEN_OFF_NAMES) add(ScanFilter.Builder().setDeviceName(name).build())
+        add(ScanFilter.Builder().setServiceData(REMOTE_ID_UUID, ByteArray(0)).build()) // drones
         // Item trackers: separated Find My devices, and the trackers' own service IDs.
         add(ScanFilter.Builder().setManufacturerData(0x004C, Trackers.appleFilterData, byteArrayOf(-1, -1)).build())
         for (u in Trackers.filterUuids16.map { ParcelUuid.fromString("%08x-0000-1000-8000-00805f9b34fb".format(it)) }) {
@@ -328,6 +335,14 @@ class ScanService : Service() {
             @Suppress("DEPRECATION")
             val ssid = r.SSID?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }
             val bssid = r.BSSID ?: continue
+            if (Build.VERSION.SDK_INT >= 30) {
+                // Drones can also send Remote ID inside Wi-Fi beacons, as a vendor-specific element.
+                for (e in r.informationElements) {
+                    if (e.id != 221) continue
+                    val bytes = ByteArray(e.bytes.remaining()).also { e.bytes.duplicate().get(it) }
+                    onRemoteId(bssid, r.level) { RemoteId.fromWifiElement(bytes, it) }
+                }
+            }
             sighting(Source.WIFI, bssid, ssid, r.level) { DeviceGuesser.wifi(bssid, ssid) }
         }
         Detections.setStatus { it.copy(wifi = "${fresh.size} networks in range · every ${wifiEverySeconds}s") }
@@ -624,6 +639,54 @@ class ScanService : Service() {
         }
     }
 
+    // --- Drones and police aircraft ---
+
+    private fun onRemoteId(transmitter: String, rssi: Int, parse: (RemoteId.Drone) -> RemoteId.Drone?) {
+        if (!prefs.airDrones) return
+        val me = currentLocation()
+        AirWatch.onRemoteId(transmitter, rssi, parse, me?.latitude, me?.longitude)?.let { notifyAir(it) }
+    }
+
+    /** Asks the ADS-B feed for law-enforcement aircraft around you every so often, while that's on. */
+    private fun startAircraft() = scope.launch(Dispatchers.IO) {
+        while (isActive) {
+            val me = currentLocation()
+            if (prefs.airAircraft && me != null) {
+                runCatching { Adsb.fetchPolice(this@ScanService, me.latitude, me.longitude) }
+                    .onSuccess { found ->
+                        AirWatch.onAircraft(found, me.latitude, me.longitude, prefs.airAlertMiles * 1609.34)
+                            .forEach { withContext(Dispatchers.Main) { notifyAir(it) } }
+                    }
+                    .onFailure { AppLog.w("Police aircraft feed: ${it.javaClass.simpleName}") }
+            }
+            delay(AIRCRAFT_POLL_MS)
+        }
+    }
+
+    private fun notifyAir(c: AirContact) {
+        val away = c.distanceM?.let { formatShortDistance(it) + " away" }
+        val title = when (c.kind) {
+            AirContact.Kind.DRONE -> "Drone nearby"
+            AirContact.Kind.AIRCRAFT -> "Police aircraft nearby: ${c.title}"
+        }
+        val text = listOfNotNull(away, c.altitudeText, c.headingDeg?.let { "heading ${compass(it.toFloat())}" }).joinToString(" · ")
+            .ifEmpty { c.detail }
+        AlertSound.play(this, AlertSound.Kind.AIR)
+        CarDisplay.publishAlert(title, text)
+        val n = NotificationCompat.Builder(this, CH_ALERTS)
+            .setSmallIcon(R.drawable.ic_stat_siren)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$text\n${c.detail}"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(openAppIntent())
+            .setAutoCancel(true)
+            .setTimeoutAfter(10 * 60_000L)
+            .build()
+        runCatching { NotificationManagerCompat.from(this).notify(AIR_ID_BASE + Math.floorMod(c.key.hashCode(), 1000), n) }
+    }
+
     private fun currentLocation(): Location? =
         lastLocation?.takeIf { System.currentTimeMillis() - it.time < LOCATION_MAX_AGE_MS }
 
@@ -687,6 +750,9 @@ class ScanService : Service() {
         /** Moved at least this far with a tracker, so one in a neighbor's car parked beside you doesn't count. */
         private const val TRACKER_MIN_DISTANCE_M = 800.0
         private const val CAMERA_ID_BASE = 3000
+        private const val AIR_ID_BASE = 4000
+        private const val AIRCRAFT_POLL_MS = 30_000L
+        private val REMOTE_ID_UUID: ParcelUuid = ParcelUuid.fromString(RemoteId.BLE_SERVICE_UUID)
         private const val CAMERA_REALERT_MS = 15 * 60_000L
         private const val BLE_RESTART_MS = 10 * 60_000L
         private const val CLASSIC_INTERVAL_MS = 30_000L

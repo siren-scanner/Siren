@@ -139,7 +139,7 @@ private fun ManualContent() {
     Para("These colors are used for the stripe on each card and for map pins.")
 
     Section("Alerts")
-    Bullet("Each kind of alert has its own sound: a short siren-style yelp for police equipment (nearby or following you), two low beeps for a public-safety radio transmitting nearby, three quick high beeps for an unknown tracker traveling with you, and a rising chime for a plate reader ahead. Other matches (fleet, fire / EMS) are silent unless you turn them on. The same sound won't repeat within 8 seconds.")
+    Bullet("Each kind of alert has its own sound: a short siren-style yelp for police equipment (nearby or following you), two low beeps for a public-safety radio transmitting nearby, three quick high beeps for an unknown tracker traveling with you, a rising chime for a plate reader ahead, and a falling whoosh for a drone or police aircraft. Other matches (fleet, fire / EMS) are silent unless you turn them on. The same sound won't repeat within 8 seconds.")
     Bullet("Sounds come out of the phone's own speaker, even when it's connected to the car, and music in the car is lowered briefly so you can hear them. To have them play through the car or headphones instead, turn on Play through the car when connected. With the phone on silent they don't play, unless you turn on Play even when the phone is on silent (alarm volume). Change them, or try each one with Test, in Settings > Alerts > Sounds. Alert notifications still vibrate.")
     Bullet("Teslas broadcast a Bluetooth signal for the phone key, named \"S\", 16 letters and numbers worked out from the car's VIN, and a \"C\". That name pattern is unique to Teslas, so Siren shows these as Tesla car key, without (UNK). If you drive a Tesla, yours will show up in With me on every drive; hold it and hide it by name to clear it. Other Teslas stay visible, since some police departments drive them.")
     Bullet("The banner at the top turns red while any match has been seen in the last 30 seconds, and shows the strongest one.")
@@ -181,6 +181,7 @@ private fun ManualContent() {
     Bullet("Hide everyday (All nearby, on by default) leaves out devices Siren's guesses identify as ordinary: home routers, phones, headphones, watches, TVs, speakers, printers, laptops, fitness gear, beacons, and Apple or Google tags near their owner. Matches, your watch rules and devices Siren can't identify are always shown, and vehicle hotspots stay visible. The count line says how many were hidden; tap the chip to see everything.")
     Bullet("All nearby - every device currently in range, matches first. Unmatched devices drop off 2 minutes after they're last seen.")
     Bullet("With me - devices that have stayed with you for 5+ minutes while you moved at least 500 m (about a third of a mile), longest first. Each shows \"With you 2 h 10 min · 34 mi\". Your own phone, watch, headphones and car will be here (hold one and hide it to clear it); anything you don't recognise that keeps turning up is worth a closer look. Devices that change their Bluetooth address (most phones and AirPods, about every 15 minutes) restart their count when they do.")
+    Bullet("Air - drones and police aircraft around you right now (see \"Drones and police aircraft\" below).")
     Bullet("History - saved encounters from all past sessions (see below).")
     Bullet("The type buttons (All types, BLE, Bluetooth, Wi-Fi, RF) filter whichever tab you're on. Each shows how many of that type there are.")
     Bullet("Clear empties the current session's lists. On the History tab the button is Delete instead.")
@@ -244,6 +245,18 @@ private fun ManualContent() {
     Bullet("No alerts while you're stopped, since \"ahead\" needs a direction of travel.")
     Bullet("The map is only as complete as volunteers have made it. Unmapped cameras won't show, and directions can be off. You can add missing cameras at deflock.me.")
     Bullet("Turn the layer off or change the alert distance in Settings > Plate readers.")
+
+    Section("Drones and police aircraft (beta)")
+    Para(
+        "New and not yet tested in the field - if you try it, you're a beta tester, and feedback is very welcome " +
+            "(Settings > Drones & aircraft > Send feedback). Both show in the Air tab and on the map as purple arrows " +
+            "pointing where they're heading. Tap one in the Air tab to see it on the map."
+    )
+    Bullet("Drones: most drones must broadcast Remote ID - their serial number, position, height, speed and often where their operator is standing - over Bluetooth and Wi-Fi. Siren hears it directly, with no internet, typically within a few hundred metres to a mile. The operator's broadcast position shows on the map as a grey dot.")
+    Bullet("Remote ID doesn't say who owns a drone, so every drone is listed. The serial number and model are your best clue: Skydio, BRINC and \"drone as first responder\" programs are mostly police and fire. Small drones under 250 g and some agencies with FAA waivers don't broadcast.")
+    Bullet("Police aircraft: with Police aircraft (online) on, Siren checks the free community ADS-B feed at adsb.lol every 30 seconds while scanning, and picks out helicopters and planes registered to police departments, sheriffs, state patrols and federal law enforcement in the FAA's public aircraft registry. It needs a data connection, and the feed is only told your area, rounded to about 10 km.")
+    Bullet("You get an alert (with its own falling \"whoosh\" sound) when a drone is first heard and when a police aircraft comes within the alert distance (default 5 miles, Settings > Drones & aircraft), then again only after 30 minutes. Aircraft further away still show in the Air tab.")
+    Bullet("Police can switch ADS-B off on sensitive flights, and some aircraft are registered to companies rather than the agency flying them, so no alert doesn't mean nothing overhead. The aircraft list comes from the FAA registry at the time of the app version you have.")
 
     Section("History and export")
     Bullet("Matched detections are saved automatically to the phone every 15 seconds while scanning, and when you stop. Unmatched devices are not saved.")
@@ -329,7 +342,7 @@ private fun ManualContent() {
     Bullet("While it's on, the controls it manages are greyed out and show its choice. Turn it off to use your own settings, which are kept.")
 
     Section("Settings reference")
-    Bullet("Settings opens a menu of sections: Alerts, Plate readers, Scanning, Map, Radio, Watch rules & hidden, Car display, Backup sharing & updates, ${if (AiEngine.AVAILABLE_IN_BUILD) "On-device AI, " else ""}and Help & diagnostics. Tap one to open it; the back arrow (or your phone's back gesture) returns to the menu, and Done closes Settings.")
+    Bullet("Settings opens a menu of sections: Alerts, Plate readers, Drones & aircraft, Scanning, Map, Radio, Watch rules & hidden, Car display, Backup sharing & updates, ${if (AiEngine.AVAILABLE_IN_BUILD) "On-device AI, " else ""}and Help & diagnostics. Tap one to open it; the back arrow (or your phone's back gesture) returns to the menu, and Done closes Settings.")
     Bullet("Turn on automatically (Bluetooth, Location, Wi-Fi scanning, battery optimization) - all on by default; changes apply from the next prompt.")
     Bullet("Scanning: fast Wi-Fi scans, targeted screen-off scan and keep screen on - all on by default. Fast Wi-Fi and the targeted scan take effect right away; keep screen on applies the next time you press Start.")
     Bullet("Alert signal strength, RF options and the traveling-with-you time and distance apply the next time you press Start.")
@@ -371,6 +384,7 @@ private val TOPICS = listOfNotNull(
     "Hiding devices" to "Hiding",
     "Map" to "Map",
     "Known plate-reader cameras" to "Cameras",
+    "Drones and police aircraft (beta)" to "Air",
     "History and export" to "History",
     "Backing up and moving phones" to "Backup",
     "Sharing and updates" to "Sharing",

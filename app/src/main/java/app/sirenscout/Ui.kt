@@ -143,6 +143,8 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
         var detailTarget by remember { mutableStateOf<Detection?>(null) }
         var watchTarget by remember { mutableStateOf<Detection?>(null) }
         val visible = items.values.filterNot(hidden::hides)
+        val air = AirWatch.contacts.collectAsStateWithLifecycle().value.values
+            .sortedWith(compareBy<AirContact> { it.distanceM ?: Double.MAX_VALUE }.thenByDescending { it.lastSeen })
         val matches = visible.filter { it.signature != null }.sortedByDescending { it.lastSeen }
         // Trackers are everywhere in other people's things; they alert only when they follow you.
         val active = matches.filter {
@@ -155,6 +157,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             )
             Tab.WITH_ME -> visible.filter { it.withYou != null }.sortedByDescending { it.withYou!!.first }
             Tab.HISTORY -> history.filterNot(hidden::hides)
+            Tab.AIR -> emptyList()
         }
 
         detailTarget?.let { d ->
@@ -252,11 +255,13 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                     FilterChip(selected = tab == Tab.MATCHES, onClick = { tab = Tab.MATCHES }, label = { Text("Matches (${matches.size})") })
                     FilterChip(selected = tab == Tab.ALL, onClick = { tab = Tab.ALL }, label = { Text("All nearby (${items.size})") })
                     FilterChip(selected = tab == Tab.WITH_ME, onClick = { tab = Tab.WITH_ME }, label = { Text("With me (${visible.count { it.withYou != null }})") })
+                    FilterChip(selected = tab == Tab.AIR, onClick = { tab = Tab.AIR }, label = { Text("Air (${air.size})") })
                     FilterChip(selected = tab == Tab.HISTORY, onClick = { tab = Tab.HISTORY }, label = { Text("History (${history.count { !hidden.hides(it) }})") })
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${shown.size} shown" + (if (everydayHidden > 0) " · $everydayHidden everyday hidden" else "") + " · tap for details, hold to hide",
+                        if (tab == Tab.AIR) "${air.size} drones / police aircraft · tap to see on the map"
+                        else "${shown.size} shown" + (if (everydayHidden > 0) " · $everydayHidden everyday hidden" else "") + " · tap for details, hold to hide",
                         style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = { showMap = !showMap }) { Text(if (showMap) "List" else "Map") }
@@ -323,7 +328,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                                 sourceRow()
                                 missingFix()
                             }
-                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = air, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
                         }
                     } else {
                         Column(
@@ -336,7 +341,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                             tabRow()
                             sourceRow()
                             missingFix()
-                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = air, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
                         }
                     }
                 }
@@ -349,13 +354,63 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                     item { Header(status, onStart, onStop, onToggleSettings = { showSettings = !showSettings }) }
                     item { AlertBanner(active, status.running) }
                     item { tabRow() }
-                    item { sourceRow() }
-                    items(shown, key = { it.uid }) { DetectionRow(it, now, onClick = { detailTarget = it }, onLongClick = { hideTarget = it }) }
+                    if (tab == Tab.AIR) {
+                        if (air.isEmpty()) item {
+                            Text(
+                                if (status.running) "No drones or police aircraft around right now." else "Press Start to listen for drones and check for police aircraft.",
+                                style = MaterialTheme.typography.bodyMedium, color = Color.Gray,
+                            )
+                        }
+                        items(air, key = { it.key }) { c ->
+                            AirRow(c, now, onClick = {
+                                if (c.lat != null && c.lon != null) {
+                                    showMap = true
+                                    MapFocus.pending.value = MapFocus.Request(c.key, c.lat, c.lon, c.title)
+                                }
+                            })
+                        }
+                    } else {
+                        item { sourceRow() }
+                        items(shown, key = { it.uid }) { DetectionRow(it, now, onClick = { detailTarget = it }, onLongClick = { hideTarget = it }) }
+                    }
                 }
             }
         }
     } }
 }
+
+/** A drone or police aircraft in the Air tab. Tap to see it on the map. */
+@Composable
+private fun AirRow(c: AirContact, now: Long, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.height(IntrinsicSize.Min)) {
+            Box(Modifier.width(6.dp).fillMaxHeight().background(AIR_COLOR))
+            Column(Modifier.padding(12.dp)) {
+                Text(c.title, style = MaterialTheme.typography.titleMedium)
+                Text(c.kind.label + " · " + c.detail, style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE))
+                Text(
+                    listOfNotNull(
+                        c.distanceM?.let { formatShortDistance(it) + " away" },
+                        c.altitudeText,
+                        c.speedMs?.takeIf { it > 0.5 }?.let { if (usesMiles()) "%.0f mph".format(it * 2.23694) else "%.0f km/h".format(it * 3.6) },
+                        c.headingDeg?.let { "heading " + compass(it.toFloat()) },
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                c.operatorLat?.let { _ ->
+                    Text("Operator position broadcast - tap to see it on the map", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                }
+                Text(
+                    (c.rssi?.let { "$it dBm · " } ?: "") + "seen ${((now - c.lastSeen) / 1000).coerceAtLeast(0)}s ago",
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                )
+            }
+        }
+    }
+}
+
+/** Drones and aircraft, in the list and on the map. */
+val AIR_COLOR = Color(0xFF7E57C2)
 
 @Composable
 private fun Header(status: ScanStatus, onStart: () -> Unit, onStop: () -> Unit, onToggleSettings: () -> Unit) {
@@ -416,7 +471,7 @@ private fun AlertBanner(active: List<Detection>, running: Boolean) {
     }
 }
 
-private enum class Tab { MATCHES, ALL, WITH_ME, HISTORY }
+private enum class Tab { MATCHES, ALL, WITH_ME, AIR, HISTORY }
 
 internal fun ago(now: Long, time: Long): String {
     val s = ((now - time) / 1000).coerceAtLeast(0)

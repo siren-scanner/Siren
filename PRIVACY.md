@@ -8,7 +8,10 @@ Siren deletes all of it.
 
 **What goes over the network:**
 - **Map tiles** from OpenStreetMap's tile servers, for the area you're looking at.
-- **Plate-reader locations** from OpenStreetMap's Overpass API, for the area around you.
+- **Plate-reader locations** from OpenStreetMap's Overpass API, for the area around you, rounded to
+  about 10 km.
+- **Police aircraft** (Settings > Drones & aircraft > Police aircraft, if on) from the free ADS-B feed
+  at adsb.lol, every 30 seconds while scanning, for your area rounded to about 10 km.
 - Only if you turn them on yourself:
   - **Car display:** a web page served by your phone to devices on the same local network
     (your car on the phone's hotspot, for example), protected by a code.

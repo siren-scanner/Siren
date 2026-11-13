@@ -79,6 +79,7 @@ private const val FOCUS_ZOOM = 19.0
 fun DetectionMap(
     detections: List<Detection>,
     modifier: Modifier = Modifier,
+    air: List<AirContact> = emptyList(),
     onDetails: (Detection) -> Unit = {},
     onHide: (Detection) -> Unit = {},
 ) {
@@ -95,6 +96,7 @@ fun DetectionMap(
     val showCameras = remember { Prefs(context).knownCameras }
     val cameras by KnownCameras.cameras.collectAsStateWithLifecycle()
     val cameraLayer = remember { CameraLayer() }
+    val airLayer = remember { AirLayer() }
     var hasLocation by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -173,6 +175,11 @@ fun DetectionMap(
             mapView.controller.setZoom(FOCUS_ZOOM)
             mapView.controller.setCenter(point)
             org.osmdroid.views.overlay.infowindow.InfoWindow.closeAllInfoWindowsOn(mapView)
+            airLayer.marker(f.uid)?.let {
+                it.showInfoWindow()
+                mapView.invalidate()
+                return@post
+            }
             if (f.uid in markers) {
                 selected = f.uid
                 mapView.invalidate()
@@ -221,6 +228,7 @@ fun DetectionMap(
     Box(modifier.clipToBounds()) {
         AndroidView(factory = { mapView }, update = { map ->
             if (showCameras) cameraLayer.update(map, cameras, zoom)
+            airLayer.update(map, air)
             // Update markers in place so an open info window survives new scan results.
             val keys = located.mapTo(HashSet()) { it.uid }
             markers.keys.filterNot(keys::contains).forEach { key ->
@@ -352,6 +360,56 @@ private fun PinCard(d: Detection, onDetails: () -> Unit, onHide: () -> Unit, onC
     }
 }
 
+/** Drones and police aircraft: an arrow pointing where each is heading, and a drone's operator if broadcast. */
+private class AirLayer {
+    private val markers = HashMap<String, Marker>()
+    private val operators = HashMap<String, Marker>()
+
+    fun marker(key: String): Marker? = markers[key]
+
+    fun update(map: MapView, air: List<AirContact>) {
+        val keys = air.mapTo(HashSet()) { it.key }
+        for (gone in markers.keys - keys) markers.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
+        for (gone in operators.keys - keys) operators.remove(gone)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
+        val color = AIR_COLOR.toArgb()
+        for (c in air) {
+            if (c.lat != null && c.lon != null) {
+                val m = markers.getOrPut(c.key) {
+                    Marker(map).apply {
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        isFlat = true // turns with the map
+                        map.overlays.add(this)
+                    }
+                }
+                val pointing = c.headingDeg != null
+                if (m.icon == null || (m.relatedObject as? Boolean) != pointing) {
+                    m.icon = android.graphics.drawable.BitmapDrawable(
+                        map.resources,
+                        if (pointing) LocationMarker.arrow(map.context, color) else LocationMarker.dot(map.context, color),
+                    )
+                    m.relatedObject = pointing
+                }
+                m.rotation = -(c.headingDeg ?: 0.0).toFloat()
+                m.position = GeoPoint(c.lat, c.lon)
+                m.title = c.kind.label + ": " + c.title
+                m.snippet = listOfNotNull(c.detail, c.altitudeText, c.distanceM?.let { formatShortDistance(it) + " away" }).joinToString("<br>")
+            }
+            if (c.operatorLat != null && c.operatorLon != null) {
+                val op = operators.getOrPut(c.key) {
+                    Marker(map).apply {
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        icon = android.graphics.drawable.BitmapDrawable(map.resources, LocationMarker.dot(map.context, 0xFF424242.toInt()))
+                        title = "Drone operator"
+                        map.overlays.add(this)
+                    }
+                }
+                op.position = GeoPoint(c.operatorLat, c.operatorLon)
+                op.snippet = "Where the drone says its operator is (${c.detail})"
+            }
+        }
+    }
+}
+
 /** Draws known plate readers: a translucent cone for each direction they face, and a pin. */
 private class CameraLayer {
     private var shown: List<Camera>? = null
@@ -421,8 +479,6 @@ private class CameraLayer {
         private const val CONE_PIXELS = 90.0
         /** Zoomed out further than this, cones are just clutter. */
         private const val MIN_CONE_ZOOM = 12
-        private val COMPASS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
-        fun compass(bearing: Float) = COMPASS[(((bearing + 22.5f) % 360f) / 45f).toInt()]
     }
 }
 
@@ -464,3 +520,8 @@ object MapFocus {
         pending.value = Request(d.uid, lat, lon, d.title)
     }
 }
+
+private val COMPASS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+
+/** "N", "NE"… for a bearing in degrees. */
+fun compass(bearing: Float) = COMPASS[((((bearing % 360f) + 360f + 22.5f) % 360f) / 45f).toInt()]

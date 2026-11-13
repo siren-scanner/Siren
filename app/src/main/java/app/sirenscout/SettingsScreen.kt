@@ -41,6 +41,7 @@ import kotlin.math.roundToInt
 private enum class SettingsPage(val title: String, val summary: String) {
     ALERTS("Alerts", "Sounds, signal strength, police following you, unknown trackers"),
     CAMERAS("Plate readers", "Known cameras on the map and alert distance"),
+    AIR("Drones & aircraft (beta)", "Drones' Remote ID, police helicopters and planes"),
     SCANNING("Scanning", "Auto-optimize, Wi-Fi, screen off, turning things on"),
     MAP("Map", "Your location marker"),
     RADIO("Radio (RF dongle)", "Band watch, frequencies, receiver"),
@@ -91,6 +92,7 @@ fun SettingsScreen(onClose: () -> Unit) {
                         }
                         SettingsPage.ALERTS -> AlertSettings()
                         SettingsPage.CAMERAS -> CameraSettings()
+                        SettingsPage.AIR -> AirSettings()
                         SettingsPage.SCANNING -> {
                             val prefs = Prefs(LocalContext.current)
                             var auto by remember { mutableStateOf(prefs.autoOptimize) }
@@ -392,6 +394,7 @@ private fun AlertSoundSettings() {
                     AlertSound.Kind.RADIO -> prefs.soundRadio = it
                     AlertSound.Kind.TRACKER -> prefs.soundTracker = it
                     AlertSound.Kind.CAMERA -> prefs.soundCamera = it
+                    AlertSound.Kind.AIR -> prefs.soundAir = it
                     AlertSound.Kind.OTHER -> prefs.soundOther = it
                 }
             })
@@ -469,4 +472,55 @@ private fun Credits() {
             " Maps © OpenStreetMap contributors.",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
+}
+
+@Composable
+private fun AirSettings() {
+    val context = LocalContext.current
+    val prefs = Prefs(context)
+    var drones by remember { mutableStateOf(prefs.airDrones) }
+    var aircraft by remember { mutableStateOf(prefs.airAircraft) }
+    val unit = if (usesMiles()) 1f else 1.609f
+    var miles by remember { mutableFloatStateOf(prefs.airAlertMiles) }
+    androidx.compose.material3.Card {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Beta: new and not yet tested in the field", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "If you try it, you're a beta tester - thank you. Feedback on what it catches, what it misses and what " +
+                    "could be better is very welcome.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (BuildConfig.REPO_URL.isNotEmpty()) TextButton(onClick = {
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("${BuildConfig.REPO_URL}/issues/new/choose")))
+                }
+            }) { Text("Send feedback") }
+        }
+    }
+    SettingRow(
+        "Drones (Remote ID)",
+        "Most drones must broadcast their position, height and often their operator's position over Bluetooth and Wi-Fi. " +
+            "Siren listens for it while scanning - no internet needed. Alerts once per drone, then again after 30 minutes.",
+        drones,
+    ) { drones = it; prefs.airDrones = it }
+    HorizontalDivider()
+    SettingRow(
+        "Police aircraft (online)",
+        "Checks the free community ADS-B feed at adsb.lol every 30 seconds for helicopters and planes registered to police, " +
+            "sheriffs, state patrols and federal law enforcement. Needs a data connection; the feed is only told your area, " +
+            "rounded to about 10 km. Aircraft can switch ADS-B off, so no alert doesn't mean none overhead.",
+        aircraft,
+    ) { aircraft = it; prefs.airAircraft = it }
+    if (aircraft) {
+        Text("Alert within %.0f %s".format(miles * unit, if (usesMiles()) "mi" else "km"))
+        Slider(
+            value = miles, valueRange = 1f..20f,
+            onValueChange = { miles = it.roundToInt().toFloat() },
+            onValueChangeFinished = { prefs.airAlertMiles = miles },
+        )
+        Text(
+            "Police aircraft further away still show in the Air tab, up to about 35 miles (55 km).",
+            style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+        )
+    }
 }

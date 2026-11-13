@@ -144,6 +144,20 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("car_display", false)
         set(v) = sp.edit().putBoolean("car_display", v).apply()
 
+    // Drones and police aircraft (AirWatch).
+    /** Drones' Remote ID broadcasts, heard directly. */
+    var airDrones: Boolean
+        get() = sp.getBoolean("air_drones", true)
+        set(v) = sp.edit().putBoolean("air_drones", v).apply()
+    /** Law-enforcement aircraft from the online ADS-B feed (adsb.lol). On by default in Siren Test only. */
+    var airAircraft: Boolean
+        get() = sp.getBoolean("air_aircraft", BuildConfig.TEST_BUILD)
+        set(v) = sp.edit().putBoolean("air_aircraft", v).apply()
+    /** Alert when a police aircraft is within this many miles. */
+    var airAlertMiles: Float
+        get() = sp.getFloat("air_alert_miles", 5f)
+        set(v) = sp.edit().putFloat("air_alert_miles", v).apply()
+
     /** Also serve the car display on Wi-Fi networks the phone has joined, not just its hotspot / USB. */
     var carOnWifi: Boolean
         get() = sp.getBoolean("car_on_wifi", false)
@@ -183,6 +197,9 @@ class Prefs(context: Context) {
     var soundCamera: Boolean
         get() = sp.getBoolean("sound_camera", true)
         set(v) = sp.edit().putBoolean("sound_camera", v).apply()
+    var soundAir: Boolean
+        get() = sp.getBoolean("sound_air", true)
+        set(v) = sp.edit().putBoolean("sound_air", v).apply()
     var soundOther: Boolean
         get() = sp.getBoolean("sound_other", false)
         set(v) = sp.edit().putBoolean("sound_other", v).apply()

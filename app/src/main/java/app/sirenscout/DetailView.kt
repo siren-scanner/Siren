@@ -190,6 +190,7 @@ fun DetailDialog(
                     d.name?.let { Info("Broadcast name", it) }
                     when {
                         d.isDrone -> Info("Identified", "${RemoteId.LABEL} - its position, height and operator are in the Air tab")
+                        d.isJokeName -> Info("Identified", "${d.guess} - a home router named as a joke. Anyone can name their Wi-Fi anything; real police or surveillance gear doesn't announce itself.")
                         d.isTesla -> {}
                         else -> d.guess?.let { Info("Guess", "$it $GUESS_MARK") }
                     }

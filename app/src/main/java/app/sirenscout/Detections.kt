@@ -56,7 +56,10 @@ data class Detection(
     val isDrone get() = guess == RemoteId.LABEL
 
     /** Identified from what it broadcasts rather than guessed: no (UNK), and the AI isn't asked. */
-    val isIdentified get() = isTesla || isDrone
+    val isIdentified get() = isTesla || isDrone || isJokeName
+
+    /** A home router with a prank law-enforcement name ("FBI Surveillance Van"). */
+    val isJokeName get() = guess?.startsWith(JokeNames.LABEL) == true
 
     private fun markGuess(g: String) = if (isIdentified) g else "$g $GUESS_MARK"
 

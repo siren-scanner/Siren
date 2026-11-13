@@ -349,7 +349,10 @@ class ScanService : Service() {
                     onRemoteId(bssid, r.level) { RemoteId.fromWifiElement(bytes, it) }
                 }
             }
-            sighting(Source.WIFI, bssid, ssid, r.level) { if (drone) RemoteId.LABEL else DeviceGuesser.wifi(bssid, ssid) }
+            sighting(Source.WIFI, bssid, ssid, r.level) {
+                if (drone) RemoteId.LABEL
+                else DeviceGuesser.wifi(bssid, ssid).let { g -> JokeNames.label(ssid, g) ?: g }
+            }
         }
         Detections.setStatus { it.copy(wifi = "${fresh.size} networks in range · every ${wifiEverySeconds}s") }
     }

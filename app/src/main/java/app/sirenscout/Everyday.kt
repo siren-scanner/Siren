@@ -27,8 +27,16 @@ object Everyday {
         "bose", "jbl", "harman", "skullcandy", "anker", "fitbit", "garmin", "sennheiser", "jabra", "oura",
     )
 
+    /** Whether a guess names a maker of home routers, TVs and gadgets (not vehicle or fleet gear). */
+    fun isConsumerMaker(guess: String): Boolean {
+        val g = guess.lowercase()
+        if ("car hotspot" in g) return false
+        return CONSUMER_MAKERS.any { g.startsWith(it) } || "home router" in g
+    }
+
     fun isEveryday(d: Detection): Boolean {
         if (d.signature != null) return false
+        if (d.isJokeName) return true
         AiGuesser.lookup(d)?.let { ai ->
             if (ai.isOfficial) return false
             if (ai.isConsumer && ai.confidence != "low") return true

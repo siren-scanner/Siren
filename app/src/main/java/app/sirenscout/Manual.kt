@@ -211,6 +211,7 @@ private fun ManualContent() {
     Bullet("The maker comes from the Bluetooth company ID in the broadcast, or from the first half of the address (only for fixed addresses, like routers and classic Bluetooth).")
     Bullet("The type comes from known broadcast formats (AirPods, AirTag, iPhone, Windows PC), Bluetooth service and device-type codes, and Wi-Fi network-name patterns.")
     Bullet("If a device has a name, the name stays as the title and the guess appears on a line below it.")
+    Bullet("Anyone can name their Wi-Fi anything. A home router named like an agency - \"FBI Surveillance Van\", \"NSA Listening Post\", \"Police Van 3\" - is labelled Joke network name and treated as an everyday device. Real police and surveillance gear doesn't announce itself in its name.")
     Bullet("Phones and watches change their Bluetooth address every few minutes, so the same phone can appear several times, and some devices can't be guessed at all.")
 
     if (AiEngine.AVAILABLE_IN_BUILD) AiSection()

@@ -113,7 +113,11 @@ object AiGuesser {
                 "fleet (vehicle routers, rugged laptops, light-bar controllers), surveillance (plate readers, " +
                 "gunshot detectors), tracker (AirTag, Tile and similar), consumer (phones, headphones, watches, home " +
                 "routers, TVs, cars' own systems), infrastructure (shops, offices, traffic, utilities), unknown. Use " +
-                "unknown when the details don't support a real guess - never invent a brand. Answer with exactly one " +
+                "unknown when the details don't support a real guess - never invent a brand. Names are typed in by the " +
+                "owner and are often jokes: home Wi-Fi called \"FBI Surveillance Van\", \"NSA Listening Post\" or " +
+                "\"Police Van 3\" is a prank, and real police or surveillance gear never announces itself in its name. " +
+                "Judge by the maker and type first: a home-router or consumer maker means consumer, whatever the name " +
+                "says. Answer with exactly one " +
                 "line per device, in this format and nothing else:"
         )
         appendLine("number | category | confidence (low, medium or high) | what it is, in under 6 words | why, in under 15 words")

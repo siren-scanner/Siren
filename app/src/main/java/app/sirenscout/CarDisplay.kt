@@ -181,7 +181,7 @@ object CarDisplay {
             .put("color", "#%06X".format(d.signature?.category.color()?.toArgb()?.and(0xFFFFFF) ?: 0x616161))
             .put("source", d.source.label)
             .put("rssi", d.rssi)
-            .put("proximity", if (d.source == Source.RF) d.name ?: "" else proximity(d.rssi, d.source))
+            .put("proximity", if (d.source == Source.RF) d.name ?: "" else distanceText(d))
             .put("secondsAgo", (now - d.lastSeen) / 1000)
         return JSONObject()
             .put("running", status.running)

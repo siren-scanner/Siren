@@ -339,6 +339,7 @@ class ScanService : Service() {
             @Suppress("DEPRECATION")
             val ssid = r.SSID?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }
             val bssid = r.BSSID ?: continue
+            WifiBands.record(bssid, r.frequency)
             var drone = false
             if (Build.VERSION.SDK_INT >= 30) {
                 // Drones can also send Remote ID inside Wi-Fi beacons, as a vendor-specific element.
@@ -723,7 +724,7 @@ class ScanService : Service() {
             },
         )
         val text = if (d.source == Source.RF) "${d.id} · ${d.name}"
-        else "${d.source.label} · ${d.rssi} dBm · ${proximity(d.rssi, d.source)} away" + (d.name?.let { " · $it" } ?: "")
+        else "${d.source.label} · ${d.rssi} dBm · ${distanceText(d)} away" + (d.name?.let { " · $it" } ?: "")
         val n = NotificationCompat.Builder(this, CH_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_siren)
             .setContentTitle("${sig.category.label}: ${sig.label}")
@@ -804,10 +805,12 @@ fun formatShortDistance(meters: Double) = when {
  * transmitters than Bluetooth gadgets, so they get their own numbers. Walls, bodies and the car
  * itself weaken signals, so things are often closer than they seem.
  */
-fun proximity(rssi: Int, source: Source = Source.BLE): String = roughDistance(estimateMeters(rssi, source))
+fun proximity(rssi: Int, source: Source = Source.BLE, wifiMhz: Int? = null): String =
+    if (rssi >= 0) "distance unknown" // Android sometimes reports 0 dBm when it has no real reading
+    else roughDistance(estimateMeters(rssi, source, wifiMhz))
 
-fun estimateMeters(rssi: Int, source: Source): Double {
-    val (atOneMetre, falloff) = if (source == Source.WIFI) -35.0 to 2.8 else -59.0 to 2.2
+fun estimateMeters(rssi: Int, source: Source, wifiMhz: Int? = null): Double {
+    val (atOneMetre, falloff) = if (source == Source.WIFI) WifiBands.model(wifiMhz) else -59.0 to 2.2
     return 10.0.pow((atOneMetre - rssi) / (10 * falloff)).coerceIn(1.0, 2_000.0)
 }
 

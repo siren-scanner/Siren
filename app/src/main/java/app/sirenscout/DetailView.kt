@@ -144,7 +144,7 @@ fun DetailDialog(
                                         Text(" dBm", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 12.dp))
                                         Spacer(Modifier.weight(1f))
                                         Column(horizontalAlignment = Alignment.End) {
-                                            Text(proximity(shown), style = MaterialTheme.typography.titleMedium)
+                                            Text(proximity(shown, d.source), style = MaterialTheme.typography.titleMedium)
                                             trend?.let { Text(it, color = if (it.startsWith("Getting stronger")) Color(0xFF66BB6A) else Color(0xFFFFB300)) }
                                         }
                                     }
@@ -205,7 +205,7 @@ fun DetailDialog(
                     Info("Last seen", "${time.format(Date(d.lastSeen))} (${ago(now, d.lastSeen)})")
                     Info("Times picked up", "${d.count}")
                     d.withYou?.let { Info("Traveling with you", "With you ${formatWithYou(it)} so far, in one stretch") }
-                    if (d.source != Source.RF) Info("Strongest signal", "${d.bestRssi} dBm")
+                    if (d.source != Source.RF) Info("Strongest signal", "${d.bestRssi} dBm (${proximity(d.bestRssi, d.source)})")
                     Detections.estimate(d)?.let { e ->
                         Info(
                             "Estimated location",

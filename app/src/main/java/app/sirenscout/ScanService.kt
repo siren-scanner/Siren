@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /** Foreground service that runs every scanner and raises alerts on signature matches. */
@@ -722,7 +723,7 @@ class ScanService : Service() {
             },
         )
         val text = if (d.source == Source.RF) "${d.id} · ${d.name}"
-        else "${d.source.label} · ${d.rssi} dBm · ${proximity(d.rssi)}" + (d.name?.let { " · $it" } ?: "")
+        else "${d.source.label} · ${d.rssi} dBm · ${proximity(d.rssi, d.source)} away" + (d.name?.let { " · $it" } ?: "")
         val n = NotificationCompat.Builder(this, CH_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_siren)
             .setContentTitle("${sig.category.label}: ${sig.label}")
@@ -797,9 +798,36 @@ fun formatShortDistance(meters: Double) = when {
     else -> formatDistance(meters)
 }
 
-fun proximity(rssi: Int) = when {
-    rssi >= -60 -> "very close"
-    rssi >= -75 -> "close"
-    rssi >= -88 -> "nearby"
-    else -> "far"
+/**
+ * A rough distance from signal strength: "about 40 ft". Signal falls off as
+ * rssi = (strength at 1 m) - 10·n·log10(distance); Wi-Fi access points are much stronger
+ * transmitters than Bluetooth gadgets, so they get their own numbers. Walls, bodies and the car
+ * itself weaken signals, so things are often closer than they seem.
+ */
+fun proximity(rssi: Int, source: Source = Source.BLE): String = roughDistance(estimateMeters(rssi, source))
+
+fun estimateMeters(rssi: Int, source: Source): Double {
+    val (atOneMetre, falloff) = if (source == Source.WIFI) -35.0 to 2.8 else -59.0 to 2.2
+    return 10.0.pow((atOneMetre - rssi) / (10 * falloff)).coerceIn(1.0, 2_000.0)
+}
+
+/** "within 5 ft", "about 40 ft", "about 350 m": rounded so it doesn't look more exact than it is. */
+fun roughDistance(meters: Double): String {
+    fun near(v: Double, step: Int) = ((v / step).roundToInt() * step).coerceAtLeast(step)
+    return if (usesMiles()) {
+        val ft = meters * 3.281
+        when {
+            ft < 6 -> "within 5 ft"
+            ft < 50 -> "about ${near(ft, 5)} ft"
+            ft < 300 -> "about ${near(ft, 10)} ft"
+            ft < 1_500 -> "about ${near(ft, 50)} ft"
+            else -> "about %.1f mi".format(meters / 1609.34)
+        }
+    } else when {
+        meters < 2 -> "within 2 m"
+        meters < 20 -> "about ${near(meters, 1)} m"
+        meters < 100 -> "about ${near(meters, 5)} m"
+        meters < 1_000 -> "about ${near(meters, 25)} m"
+        else -> "about %.1f km".format(meters / 1000)
+    }
 }

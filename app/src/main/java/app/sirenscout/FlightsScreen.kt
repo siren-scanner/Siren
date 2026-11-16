@@ -355,7 +355,7 @@ fun AirDetailDialog(c: AirContact, onClose: () -> Unit, onShowOnMap: (lat: Doubl
                             c.speedMs?.let { if (miles) "%.0f mph".format(it * 2.23694) else "%.0f km/h".format(it * 3.6) },
                             c.headingDeg?.let { "heading ${compass(it.toFloat())} (%.0f°)".format(it) },
                             c.distanceM?.let { formatShortDistance(it) + " from you" },
-                            c.rssi?.let { "signal $it dBm (${proximity(it)})" },
+                            c.rssi?.let { "signal $it dBm (transmitter ${proximity(it)} away)" },
                         ).forEach { Text(it) }
                         if (c.operatorLat != null && c.operatorLon != null) {
                             val fromDrone = if (c.lat != null && c.lon != null) " · " + formatShortDistance(Odometer.distanceM(c.lat, c.lon, c.operatorLat, c.operatorLon)) + " from the drone" else ""

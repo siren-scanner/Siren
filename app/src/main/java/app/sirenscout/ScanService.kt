@@ -661,7 +661,7 @@ class ScanService : Service() {
     /** Asks the ADS-B feed for law-enforcement aircraft around you every so often, while that's on. */
     private fun startAircraft() = scope.launch(Dispatchers.IO) {
         while (isActive) {
-            val me = currentLocation()
+            val me = recentLocation()
             val clock = java.time.LocalTime.now().withNano(0).withSecond(0)
             when {
                 !prefs.airAircraft -> AirWatch.feedStatus.value = "Police aircraft check is off (Settings > Drones & aircraft)."
@@ -707,6 +707,13 @@ class ScanService : Service() {
             .build()
         runCatching { NotificationManagerCompat.from(this).notify(AIR_ID_BASE + Math.floorMod(c.key.hashCode(), 1000), n) }
     }
+
+    /**
+     * Where you were in the last half hour: enough for the aircraft check, which only sends your
+     * area rounded to 10 km anyway. Indoors, GPS can go minutes without a fresh fix.
+     */
+    private fun recentLocation(): Location? =
+        lastLocation?.takeIf { System.currentTimeMillis() - it.time < 30 * 60_000L }
 
     private fun currentLocation(): Location? =
         lastLocation?.takeIf { System.currentTimeMillis() - it.time < LOCATION_MAX_AGE_MS }

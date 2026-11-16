@@ -146,7 +146,8 @@ fun SettingsScreen(onClose: () -> Unit) {
 
 @Composable
 internal fun SettingRow(title: String, detail: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    // The whole row flips the switch, not just the switch itself.
+    Row(Modifier.clickable(enabled = enabled) { onChange(!checked) }, verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = Color.Gray)

@@ -42,6 +42,8 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withTimeout
 import java.util.Locale
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -561,6 +563,7 @@ class ScanService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(DeepLink.intent(this, DeepLink.Device(d.key)))
+            .setGroup("siren-" + DeepLink.Device(d.key).encode())
             .setAutoCancel(true)
             .apply { action?.let(::addAction) }
             .build()
@@ -634,6 +637,7 @@ class ScanService : Service() {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
                 .setContentIntent(DeepLink.intent(this, DeepLink.Place(cam.lat, cam.lon, cam.label)))
+            .setGroup("siren-" + DeepLink.Place(cam.lat, cam.lon, cam.label).encode())
                 .setAutoCancel(true)
                 .setTimeoutAfter(60_000)
                 .build()
@@ -666,7 +670,11 @@ class ScanService : Service() {
             when {
                 !prefs.airAircraft -> AirWatch.feedStatus.value = "Police aircraft check is off (Settings > Drones & aircraft)."
                 me == null -> AirWatch.feedStatus.value = "Waiting for a location fix before checking for police aircraft."
-                else -> runCatching { Adsb.fetch(this@ScanService, me.latitude, me.longitude) }
+                // A lookup can stall (a connection opened as Wi-Fi comes up); give up after a minute
+                // rather than leave the check stuck for good.
+                else -> runCatching {
+                    withTimeout(60_000) { runInterruptible { Adsb.fetch(this@ScanService, me.latitude, me.longitude) } }
+                }
                     .onSuccess { found ->
                         val police = found.count { it.second?.police == true }
                         val possible = found.count { it.second?.police == false }
@@ -702,6 +710,7 @@ class ScanService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(DeepLink.intent(this, DeepLink.Air(c.key, c.title)))
+            .setGroup("siren-" + DeepLink.Air(c.key, c.title).encode())
             .setAutoCancel(true)
             .setTimeoutAfter(10 * 60_000L)
             .build()
@@ -739,6 +748,7 @@ class ScanService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(DeepLink.intent(this, DeepLink.Device(d.key)))
+            .setGroup("siren-" + DeepLink.Device(d.key).encode())
             .setAutoCancel(true)
             .build()
         runCatching { NotificationManagerCompat.from(this).notify(ALERT_ID, n) }

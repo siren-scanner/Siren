@@ -144,7 +144,7 @@ fun DetailDialog(
                                         Text(" dBm", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(bottom = 12.dp))
                                         Spacer(Modifier.weight(1f))
                                         Column(horizontalAlignment = Alignment.End) {
-                                            Text(proximity(shown, d.source, WifiBands.mhz(d.id)), style = MaterialTheme.typography.titleMedium)
+                                            Text(liveDistance(d, shown), style = MaterialTheme.typography.titleMedium)
                                             trend?.let { Text(it, color = if (it.startsWith("Getting stronger")) Color(0xFF66BB6A) else Color(0xFFFFB300)) }
                                         }
                                     }
@@ -299,4 +299,17 @@ private fun BeepWhileFinding(enabled: Boolean, rssi: Int?) {
             tone.release()
         }
     }
+}
+
+/**
+ * The live meter's distance: this band's latest reading, and for a router on several bands the
+ * others' too, so it matches the card.
+ */
+private fun liveDistance(d: Detection, rssi: Int): String {
+    if (rssi >= 0) return "distance unknown"
+    val mine = estimateMeters(rssi, d.source, WifiBands.mhz(d.id))
+    val others = WifiBands.siblings(d, Detections.items.value.values)
+        .filter { it.key != d.key && it.rssi < 0 }
+        .map { estimateMeters(it.rssi, it.source, WifiBands.mhz(it.id)) }
+    return roughDistance((others + mine).min())
 }

@@ -364,6 +364,8 @@ object Flights {
         load(context)
         save(context, _tracked.value.filterNot { it.id == id })
         live.value = live.value - id
+        // Nothing left to follow: end the background service and its notification now, not at its next check.
+        if (_tracked.value.isEmpty()) context.stopService(android.content.Intent(context, FlightWatchService::class.java))
     }
 
     /** Drops flights whose days are over; true if any are left. */

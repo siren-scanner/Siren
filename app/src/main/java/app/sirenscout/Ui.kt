@@ -528,7 +528,7 @@ private fun AlertBanner(active: List<Detection>, running: Boolean) {
                     "Emergency equipment nearby (${active.size})",
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White,
                 )
-                val where = if (strongest.source == Source.RF) strongest.id else "${strongest.rssi} dBm, ${proximity(strongest.rssi, strongest.source)} away"
+                val where = if (strongest.source == Source.RF) strongest.id else "${strongest.rssi} dBm, ${distanceText(strongest)} away"
                 Text("${strongest.signature?.label} - $where", color = Color.White)
             }
         }
@@ -575,7 +575,8 @@ private fun DetectionRow(d: Detection, now: Long, onClick: () -> Unit, onLongCli
                 }
                 d.guessLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE)) }
                 Text(
-                    "${d.source.label} · ${d.id}" + if (d.source != Source.RF) " · ${d.rssi} dBm · ${proximity(d.rssi, d.source)}" else "",
+                    d.source.label + (WifiBands.band(d.id)?.takeIf { d.source == Source.WIFI }?.let { " $it" } ?: "") +
+                        " · ${d.id}" + if (d.source != Source.RF) " · ${if (d.rssi < 0) "${d.rssi} dBm" else "no signal reading"} · ${distanceText(d)}" else "",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(

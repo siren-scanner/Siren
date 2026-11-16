@@ -110,6 +110,7 @@ class ScanService : Service() {
         val filter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_FOUND)
             addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
         }
         ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         ContextCompat.registerReceiver(
@@ -364,6 +365,11 @@ class ScanService : Service() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
+                BluetoothAdapter.ACTION_STATE_CHANGED -> when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)) {
+                    // Scanning picks up again by itself when Bluetooth comes back; until then, say so.
+                    BluetoothAdapter.STATE_OFF -> notifyBluetoothOff()
+                    BluetoothAdapter.STATE_ON -> NotificationManagerCompat.from(this@ScanService).cancel(BT_OFF_ID)
+                }
                 BluetoothDevice.ACTION_FOUND -> {
                     ScanHealth.classic()
                     val device = IntentCompat.getParcelableExtra(
@@ -724,6 +730,26 @@ class ScanService : Service() {
     private fun recentLocation(): Location? =
         lastLocation?.takeIf { System.currentTimeMillis() - it.time < 30 * 60_000L }
 
+    /** Bluetooth went off while scanning (often the phone's own auto-off): tell the user, tap to turn it back on. */
+    private fun notifyBluetoothOff() {
+        AppLog.w("Bluetooth was turned off while scanning")
+        AutoOff.bluetoothTurnedOff(this)
+        val text = "Siren can't hear Bluetooth devices until it's back on. Tap to turn it on."
+        val more = " If you didn't switch it off, your phone may do it by itself after a few minutes with nothing " +
+            "connected - Siren only listens, so it doesn't count. To stop that (on GrapheneOS and some other phones): " +
+            "${AutoOff.BLUETOOTH_SETTING} > Never."
+        val n = NotificationCompat.Builder(this, CH_ALERTS)
+            .setSmallIcon(R.drawable.ic_stat_siren)
+            .setContentTitle("Bluetooth was switched off")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text + more))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(openAppIntent()) // opening Siren while scanning asks to turn Bluetooth on
+            .setAutoCancel(true)
+            .build()
+        runCatching { NotificationManagerCompat.from(this).notify(BT_OFF_ID, n) }
+    }
+
     private fun currentLocation(): Location? =
         lastLocation?.takeIf { System.currentTimeMillis() - it.time < LOCATION_MAX_AGE_MS }
 
@@ -784,6 +810,7 @@ class ScanService : Service() {
         private const val CH_ALERTS = "alerts_v2"
         private const val ONGOING_ID = 1
         private const val ALERT_ID = 2
+        private const val BT_OFF_ID = 6000
         private const val FOLLOW_ID_BASE = 2000
         /** Moved at least this far with a tracker, so one in a neighbor's car parked beside you doesn't count. */
         private const val TRACKER_MIN_DISTANCE_M = 800.0

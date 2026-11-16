@@ -96,6 +96,7 @@ fun SettingsScreen(onClose: () -> Unit) {
                         SettingsPage.SCANNING -> {
                             val prefs = Prefs(LocalContext.current)
                             var auto by remember { mutableStateOf(prefs.autoOptimize) }
+                            AutoOffWarning()
                             ScanningSettings(prefs, auto) { auto = it; prefs.autoOptimize = it }
                             AutoEnableSettings(prefs)
                         }
@@ -531,5 +532,28 @@ private fun AirSettings() {
             "Also list every other aircraft in the area, in grey and without alerts - handy to check the feed is working. Off: only law-enforcement aircraft.",
             showAll,
         ) { showAll = it; prefs.airShowAll = it }
+    }
+}
+
+/** Warns when the phone switches Bluetooth off by itself, which stops Bluetooth scanning. */
+@Composable
+private fun AutoOffWarning() {
+    val context = LocalContext.current
+    var times by remember { mutableStateOf(AutoOff.recentBluetoothOffs(context)) }
+    if (times == 0) return
+    androidx.compose.material3.Card {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                "Bluetooth was switched off while scanning ($times time${if (times == 1) "" else "s"} this week)",
+                style = MaterialTheme.typography.titleSmall, color = Color(0xFFFFB300),
+            )
+            Text(
+                "If that wasn't you, your phone is probably turning Bluetooth off by itself when nothing is connected - Siren " +
+                    "only listens, so it doesn't count, and Bluetooth scanning stops until it's back on. To keep it on (GrapheneOS " +
+                    "and some other phones): ${AutoOff.BLUETOOTH_SETTING} > Never.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(onClick = { AutoOff.dismiss(context); times = 0 }) { Text("Dismiss") }
+        }
     }
 }

@@ -71,6 +71,9 @@ import kotlin.math.sin
 /** Street level: individual buildings and parking spaces. */
 private const val FOCUS_ZOOM = 19.0
 
+/** A few miles across: room for an aircraft or drone to move without leaving the screen. */
+private const val AIR_FOCUS_ZOOM = 12.0
+
 /**
  * OpenStreetMap view with one pin per detection, placed where its signal was strongest. Tapping a
  * pin shows a card with [onDetails] and [onHide], as tapping and holding a row does in the list.
@@ -174,14 +177,17 @@ fun DetectionMap(
         mapView.post {
             val point = GeoPoint(f.lat, f.lon)
             mapView.mapOrientation = 0f
-            mapView.controller.setZoom(FOCUS_ZOOM)
-            mapView.controller.setCenter(point)
             org.osmdroid.views.overlay.infowindow.InfoWindow.closeAllInfoWindowsOn(mapView)
+            // Aircraft move fast: zoom out to a few miles around where it is now, not street level.
             airLayer.marker(f.uid)?.let {
+                mapView.controller.setZoom(AIR_FOCUS_ZOOM)
+                mapView.controller.setCenter(it.position)
                 it.showInfoWindow()
                 mapView.invalidate()
                 return@post
             }
+            mapView.controller.setZoom(FOCUS_ZOOM)
+            mapView.controller.setCenter(point)
             if (f.uid in markers) {
                 selected = f.uid
                 mapView.invalidate()

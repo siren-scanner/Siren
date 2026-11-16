@@ -60,8 +60,11 @@ class FlightWatchService : Service() {
             for (t0 in active) {
                 var t = t0
                 if (t.startDay.isNotEmpty() && "$today:today" !in t.notified) {
-                    // A new day for a flight expected on several days: say so, and start its story afresh.
-                    post(Flights.Update("$today:today", "${t.id} is expected today", "Siren will tell you when it shows up, takes off and lands."), t.id)
+                    // A new day for a flight expected on several days: say so (unless it was only just added
+                    // today - you know it's today), and start its story afresh.
+                    if (Flights.tripDay(t.addedAt) < today) {
+                        post(Flights.Update("$today:today", "${t.id} is expected today", "Siren will tell you when it shows up, takes off and lands."), t.id)
+                    }
                     t = t.copy(notified = t.notified.filter { it.startsWith(today) }.toSet() + "$today:today", phase = "", lastSeenAt = 0)
                     Flights.save(this, Flights.tracked.value.map { if (it.id == t.id) t else it })
                 }
@@ -105,6 +108,7 @@ class FlightWatchService : Service() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(u.text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(DeepLink.intent(this, DeepLink.Flight(flightId)))
+            .setGroup("siren-" + DeepLink.Flight(flightId).encode() + u.key)
             .setAutoCancel(true)
             .build()
         runCatching { NotificationManagerCompat.from(this).notify(UPDATE_ID_BASE + Math.floorMod(u.title.hashCode(), 1000), n) }

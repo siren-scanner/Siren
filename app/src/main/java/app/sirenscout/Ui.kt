@@ -811,7 +811,7 @@ internal fun BackupButtons() {
         ) { Text("Restore") }
     }
     Text(
-        "Saves settings, hidden devices, AI identifications and history to a file you choose. Use it before reinstalling or to move to a new phone.",
+        "Saves settings, hidden devices, ${if (AiEngine.AVAILABLE_IN_BUILD) "AI identifications " else ""}and history to a file you choose. Use it before reinstalling or to move to a new phone.",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
 }
@@ -855,7 +855,7 @@ internal fun DataShareButtons() {
             title = { Text("Share data") },
             text = {
                 Column {
-                    Choice("AI identifications ($ai)", withAi) { withAi = it }
+                    if (AiEngine.AVAILABLE_IN_BUILD || ai > 0) Choice("AI identifications ($ai)", withAi) { withAi = it }
                     Choice("Hidden devices and names ($hidden)", withHidden) { withHidden = it }
                     Choice("Watch rules ($rules)", withRules) { withRules = it }
                     Choice("History, with where things were seen", withHistory) { withHistory = it }
@@ -908,7 +908,7 @@ internal fun DataShareButtons() {
         ) { Text("Add shared data") }
     }
     Text(
-        "Send what this phone has learned - AI identifications, hidden devices, watch rules - to another phone with Siren, " +
+        "Send what this phone has learned - ${if (AiEngine.AVAILABLE_IN_BUILD) "AI identifications, " else ""}hidden devices, watch rules - to another phone with Siren, " +
             "through Quick Share or a message. On that phone, tap Add shared data and pick the file (Quick Share saves to Downloads).",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
@@ -1167,7 +1167,12 @@ internal fun CarDisplaySettings(prefs: Prefs) {
             delay(3_000)
         }
     }
-    Text("Car display (experimental)", style = MaterialTheme.typography.titleSmall)
+    Text("Car display (beta)", style = MaterialTheme.typography.titleSmall)
+    BetaFeedbackNote(
+        "Beta: still being tested",
+        "The car display works with some cars and not others yet. If you try it, you're a beta tester - thank you! " +
+            "Feedback on which car or screen you used, what worked and what didn't is very welcome.",
+    )
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("Show Siren in another screen's browser")

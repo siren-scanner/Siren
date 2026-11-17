@@ -53,8 +53,12 @@ class Prefs(context: Context) {
         set(v) = sp.edit().putFloat("follow_distance_m", v).apply()
 
     /** Show plate readers mapped in OpenStreetMap and alert when approaching one. */
+    /**
+     * Mapped plate readers from OpenStreetMap. Downloads from the internet, so it's opt-in in the
+     * public edition (which has a REPO_URL) and on by default in the maintainer's own builds.
+     */
     var knownCameras: Boolean
-        get() = sp.getBoolean("known_cameras", true)
+        get() = sp.getBoolean("known_cameras", BuildConfig.REPO_URL.isEmpty())
         set(v) = sp.edit().putBoolean("known_cameras", v).apply()
 
     var cameraAlertM: Float

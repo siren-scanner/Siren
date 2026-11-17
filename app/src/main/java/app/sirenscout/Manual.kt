@@ -142,7 +142,6 @@ private fun ManualContent() {
     Section("Alerts")
     Bullet("Each kind of alert has its own sound: a short siren-style yelp for police equipment (nearby or following you), two low beeps for a public-safety radio transmitting nearby, three quick high beeps for an unknown tracker traveling with you, a rising chime for a plate reader ahead, and a falling whoosh for a drone or police aircraft. Other matches (fleet, fire / EMS) are silent unless you turn them on. The same sound won't repeat within 8 seconds.")
     Bullet("Sounds come out of the phone's own speaker, even when it's connected to the car, and music in the car is lowered briefly so you can hear them. To have them play through the car or headphones instead, turn on Play through the car when connected. With the phone on silent they don't play, unless you turn on Play even when the phone is on silent (alarm volume). Change them, or try each one with Test, in Settings > Alerts > Sounds. Alert notifications still vibrate.")
-    Bullet("Teslas broadcast a Bluetooth signal for the phone key, named \"S\", 16 letters and numbers worked out from the car's VIN, and a \"C\". That name pattern is unique to Teslas, so Siren shows these as Tesla car key, without (UNK). If you drive a Tesla, yours will show up in With me on every drive; hold it and hide it by name to clear it. Other Teslas stay visible, since some police departments drive them.")
     Bullet("Tap an alert notification to go straight to what it's about: the device's details, the drone or aircraft, the tracked flight, or the plate reader on the map.")
     Bullet("The banner at the top turns red while any match has been seen in the last 30 seconds, and shows the strongest one.")
     Bullet("A notification with vibration fires when a match is first seen. The same device alerts again only if it's been 2 minutes since its last alert.")
@@ -241,6 +240,7 @@ private fun ManualContent() {
         "Siren can show license plate readers that volunteers have mapped in OpenStreetMap, " +
             "mostly through the DeFlock project. This works whether or not the camera gives off any signal."
     )
+    Bullet("It downloads camera locations from the internet (OpenStreetMap), so it needs a data connection${if (BuildConfig.REPO_URL.isNotEmpty()) " and is off until you turn it on in Settings > Plate readers" else ""}. Only your area, rounded to about 10 km, is sent.")
     Bullet("Cameras appear on the map as teal camera icons. A translucent teal cone shows which way each one faces, as mapped. Where the mapper recorded the camera's exact field of view, the cone is that wide; otherwise it's drawn 50° wide.")
     Bullet("Tap a camera for its maker, the compass direction(s) it faces and who operates it, where known.")
     Bullet("Camera locations are downloaded for about 15 miles (25 km) around you, or around wherever you look on the map, and kept on the phone for a week. Moving to a new area downloads that area. The map-data servers are only told the area, rounded to about 6 miles (10 km), not your exact position.")
@@ -249,11 +249,7 @@ private fun ManualContent() {
     Bullet("The map is only as complete as volunteers have made it. Unmapped cameras won't show, and directions can be off. You can add missing cameras at deflock.me.")
     Bullet("Turn the layer off or change the alert distance in Settings > Plate readers.")
 
-    Section("Drones and police aircraft (beta)")
-    if (BuildConfig.REPO_URL.isNotEmpty()) Para(
-        "New and not yet tested in the field - if you try it, you're a beta tester, and feedback is very welcome " +
-            "(Settings > Drones & aircraft > Send feedback).",
-    )
+    Section("Drones and police aircraft")
     Para(
         "Both show in the Air tab and on the map as purple arrows " +
             "pointing where they're heading. Tap one in the Air tab, or tap its arrow on the map and then its bubble, for " +
@@ -292,8 +288,8 @@ private fun ManualContent() {
     Bullet("Codes and connections aren't included either (the car display and sync codes, the phone you sync with, and where updates come from), and restoring never changes them. So a backup from someone else can't point your phone at their device.")
 
     Section("Sharing and updates")
-    Bullet("Share data passes what one phone has learned to another: AI identifications, hidden devices and names, watch rules, and history if you tick it. It goes through Android's share menu (Quick Share, Bluetooth, a message). On the other phone, open Settings > Backup, sharing & updates > Add shared data and pick the file (Quick Share puts it in Downloads).")
-    Bullet("Adding shared data only adds: nothing on the receiving phone is removed or replaced, and its settings stay as they are. AI identifications made by an edition of Siren with on-device AI show on any phone, even one that can't run the AI itself.")
+    Bullet("Share data passes what one phone has learned to another: ${if (AiEngine.AVAILABLE_IN_BUILD) "AI identifications, " else ""}hidden devices and names, watch rules, and history if you tick it. It goes through Android's share menu (Quick Share, Bluetooth, a message). On the other phone, open Settings > Backup, sharing & updates > Add shared data and pick the file (Quick Share puts it in Downloads).")
+    Bullet("Adding shared data only adds: nothing on the receiving phone is removed or replaced, and its settings stay as they are.${if (AiEngine.AVAILABLE_IN_BUILD) " AI identifications show on any phone, even one that can't run the AI itself." else ""}")
     Bullet("History includes where things were seen, which shows where you've been. It's off unless you tick it.")
     Bullet("To sync automatically instead, use Tailscale, a free private network between your own devices (install the Tailscale app on each phone). On one phone, turn on Settings > Backup, sharing & updates > Let my other phones sync with this one; it shows its address and a code. On the other phone, enter them under Sync with another phone. From then on, every 10 minutes while both are scanning, the second phone sends its data to the first and adds the first one's. Sync now does it right away, and the line under it shows how the last sync went.")
     Bullet("Syncing, like Add shared data, only adds. Un-hiding a device on one phone doesn't un-hide it on the other. Siren only syncs over Tailscale: it listens on the phone's Tailscale address alone, only sends to Tailscale addresses (100.x.x.x or .ts.net names), and only devices that know the code can connect; New code locks out a phone you've stopped using. History is only synced if Include history is on.")
@@ -340,7 +336,11 @@ private fun ManualContent() {
     Bullet("Tuner gain: raise it if nothing ever registers, lower it if everything does.")
     Bullet("To use a receiver elsewhere (e.g. a Raspberry Pi in the car running rtl_tcp), change the host and port.")
 
-    Section("Car display (experimental)")
+    Section("Car display (beta)")
+    if (BuildConfig.REPO_URL.isNotEmpty()) Para(
+        "Beta: the car display works with some cars and not others yet. If you try it, you're a beta tester - feedback on " +
+            "which car or screen you used and what worked is very welcome (Settings > Car display > Send feedback).",
+    )
     Para("Siren can show a live page in another screen's web browser - for example a Tesla's - with the alert banner, matches with signal strength, scanner status and the latest alert.")
     Bullet("Turn it on in Settings > Car display, then press Start.")
     Bullet("Connect the car to the phone: turn on the phone's hotspot and join it from the car's Wi-Fi settings. Or plug the phone in and turn on USB tethering (Settings > Network & internet > Hotspot & tethering), if your car accepts it.")
@@ -402,14 +402,14 @@ private val TOPICS = listOfNotNull(
     "Hiding devices" to "Hiding",
     "Map" to "Map",
     "Known plate-reader cameras" to "Cameras",
-    "Drones and police aircraft (beta)" to "Air",
+    "Drones and police aircraft" to "Air",
     "Flights" to "Flights",
     "History and export" to "History",
     "Backing up and moving phones" to "Backup",
     "Sharing and updates" to "Sharing",
     "Crash reports and diagnostics" to "Diagnostics",
     "RF monitoring (optional)" to "RF",
-    "Car display (experimental)" to "Car",
+    "Car display (beta)" to "Car",
     "Auto-optimize" to "Auto",
     "Settings reference" to "Settings",
     "Limits and tips" to "Tips",

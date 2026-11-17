@@ -521,6 +521,64 @@ private fun AirSettings() {
             showAll,
         ) { showAll = it; prefs.airShowAll = it }
     }
+    HorizontalDivider()
+    AircraftDetailsSettings()
+}
+
+/** The optional US aircraft registry download, and online lookups at hexdb.io. */
+@Composable
+private fun AircraftDetailsSettings() {
+    val context = LocalContext.current
+    val prefs = Prefs(context)
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var installed by remember { mutableStateOf(AircraftRegistry.installed(context)) }
+    var busy by remember { mutableStateOf(false) }
+    var done by remember { mutableFloatStateOf(-1f) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var hexdb by remember { mutableStateOf(prefs.hexdbLookups) }
+    Text("Aircraft details", style = MaterialTheme.typography.titleMedium)
+    Text(
+        "Make, model, year built, engine, seats, owner and home base for every US-registered aircraft, from the FAA's public " +
+            "registry. It's a separate download (about 8 MB, 21 MB on the phone) so Siren itself stays small; after that, " +
+            "looking aircraft up needs no internet. Used in flight details and for aircraft on the map.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    if (installed) {
+        Text(
+            "Downloaded · FAA data from ${AircraftRegistry.dataDate(context) ?: "unknown date"} · %.0f MB".format(AircraftRegistry.sizeBytes(context) / 1e6),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+    if (busy) {
+        if (done >= 0f) androidx.compose.material3.LinearProgressIndicator(progress = { done }, modifier = Modifier.fillMaxWidth())
+        else androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    }
+    message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(enabled = !busy, onClick = {
+            busy = true; done = -1f; message = null
+            scope.launch {
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching {
+                        AircraftRegistry.download(context) { read, total -> if (total > 0) done = (read.toFloat() / total).coerceIn(0f, 1f) }
+                    }
+                }
+                busy = false
+                installed = AircraftRegistry.installed(context)
+                message = result.fold({ "Done." }, { "Download failed: ${it.message ?: it.javaClass.simpleName}. Check the internet connection and try again." })
+            }
+        }) { Text(if (installed) "Update" else "Download (8 MB)") }
+        if (installed) TextButton(enabled = !busy, onClick = {
+            AircraftRegistry.delete(context); installed = false; message = "Deleted."
+        }) { Text("Delete") }
+    }
+    SettingRow(
+        "Online details (hexdb.io)",
+        "Also asks hexdb.io, a free online aircraft database, for friendlier type names, the airline actually flying a " +
+            "leased plane, and aircraft from outside the US. It's told the aircraft's ID code when you open its details. " +
+            "hexdb.io isn't open-source or open data" + (if (BuildConfig.PUBLIC_EDITION) ", so this is off unless you turn it on." else "."),
+        hexdb,
+    ) { hexdb = it; prefs.hexdbLookups = it }
 }
 
 /** Warns when the phone switches Bluetooth off by itself, which stops Bluetooth scanning. */

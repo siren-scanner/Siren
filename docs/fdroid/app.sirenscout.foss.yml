@@ -1,5 +1,8 @@
 # Draft for F-Droid's fdroiddata repository (metadata/app.sirenscout.foss.yml).
 # Submit as a merge request - see docs/MAINTAINING.md.
+AntiFeatures:
+  NonFreeNet:
+    en-US: Optional, off by default - online aircraft details from hexdb.io, whose data isn't open.
 Categories:
   - Network Analyzer
   - Security

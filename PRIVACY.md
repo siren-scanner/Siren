@@ -14,7 +14,12 @@ Siren deletes all of it.
   at adsb.lol, every 30 seconds while scanning, for your area rounded to about 10 km.
 - **Flights you look up or track:** the flight number, callsign or tail number goes to adsb.lol. Your
   location isn't sent; distance from you is worked out on the phone.
+- **Aircraft registry** (Settings > Drones & aircraft > Aircraft details, only when you tap Download):
+  a one-off download of the FAA's public US aircraft registry from this project's GitHub releases.
+  Looking aircraft up in it then happens on the phone.
 - Only if you turn them on yourself:
+  - **Online aircraft details:** the ID code of an aircraft whose details you open goes to
+    hexdb.io, a free aircraft database that isn't open data.
   - **Car display:** a web page served by your phone to devices on the same local network
     (your car on the phone's hotspot, for example), protected by a code.
   - **Phone sync:** your phones exchange AI identifications, hidden devices, watch rules and,

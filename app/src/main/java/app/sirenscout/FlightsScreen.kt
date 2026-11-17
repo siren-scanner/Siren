@@ -225,7 +225,8 @@ fun FlightsDialog(
                     HorizontalDivider()
                     Text(
                         "Live data from the free adsb.lol ADS-B feed (volunteer receivers, so remote areas and oceans can have gaps); " +
-                            (if (BuildConfig.PUBLIC_EDITION) "" else "aircraft type and owner from hexdb.io. ") +
+                            "aircraft details from the FAA registry (if downloaded in Settings > Drones & aircraft)" +
+                            (if (Prefs(LocalContext.current).hexdbLookups) " and hexdb.io. " else ". ") +
                             "Departure and arrival airports aren't broadcast by aircraft - enter them " +
                             "to see distance and time remaining. Tracked flights are checked every minute on their days, even when Siren isn't " +
                             "scanning, and are dropped after their last day.",
@@ -241,8 +242,8 @@ fun FlightsDialog(
 @Composable
 private fun FlightCard(f: LiveFlight, from: Airport?, to: Airport?, onShowOnMap: (Double, Double, String) -> Unit) {
     val context = LocalContext.current
-    val details by androidx.compose.runtime.produceState<Pair<String?, String?>>(null to null, f.hex) {
-        value = withContext(Dispatchers.IO) { Flights.aircraftDetails(f.hex) }
+    val details by androidx.compose.runtime.produceState(Flights.AircraftInfo(), f.hex) {
+        value = withContext(Dispatchers.IO) { Flights.aircraftDetails(context, f.hex) }
     }
     val me = remember {
         runCatching { context.getSystemService(LocationManager::class.java)?.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()
@@ -272,9 +273,20 @@ private fun FlightCard(f: LiveFlight, from: Airport?, to: Airport?, onShowOnMap:
                 Flights.describeTo(f, to)?.let { Text(it) }
             }
             Text(
-                listOfNotNull(f.registration, details.first ?: f.typeCode, details.second).joinToString(" · "),
+                listOfNotNull(f.registration, details.type ?: f.typeCode, details.owner).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE),
             )
+            listOfNotNull(
+                details.year?.let { "built $it" },
+                details.engine,
+                details.seats?.takeIf { it > 0 }?.let { "$it seat${if (it == 1) "" else "s"}" },
+                details.homeBase?.let { "based in $it" },
+            ).takeIf { it.isNotEmpty() }?.let {
+                Text(it.joinToString(" · ").replaceFirstChar(Char::uppercase), style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE))
+            }
+            details.registeredTo?.let {
+                Text("Registered to $it", style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE))
+            }
             if (f.lat != null && f.lon != null) {
                 val away = me?.let { formatShortDistance(Odometer.distanceM(it.latitude, it.longitude, f.lat, f.lon)) + " from you · " }.orEmpty()
                 Text(

@@ -52,3 +52,16 @@ To release on F-Droid:
    After that, F-Droid picks up new tags by itself.
 3. Store text and screenshots come from `fastlane/metadata/android/en-US`; add a
    `changelogs/<versionCode>.txt` for each release.
+
+The optional aircraft registry download (Settings > Drones & aircraft > Aircraft details) is built
+from the FAA registry - refresh it with each release so it stays current:
+
+```
+curl -LO https://registry.faa.gov/database/ReleasableAircraft.zip && unzip ReleasableAircraft.zip MASTER.txt ACFTREF.txt
+tools/build-aircraft-registry.py MASTER.txt ACFTREF.txt | gzip -9 > aircraft-registry.txt.gz
+```
+
+- Attach `aircraft-registry.txt.gz` to every GitHub release: the public edition downloads it from
+  `releases/latest/download/aircraft-registry.txt.gz`, so a release without it breaks the download.
+- Copy it to `updates/data/` for Siren and Siren Test, which download it from the update server
+  first (and from GitHub if that fails).

@@ -1,8 +1,9 @@
 # Draft for F-Droid's fdroiddata repository (metadata/app.sirenscout.foss.yml).
 # Submit as a merge request - see docs/MAINTAINING.md.
 Categories:
+  - Network Analyzer
+  - Security
   - Navigation
-  - Connectivity
 License: GPL-3.0-or-later
 AuthorName: siren-scanner
 SourceCode: https://github.com/siren-scanner/Siren

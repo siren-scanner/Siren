@@ -6,7 +6,7 @@
 <ul>
 <li>Body cameras and their Signal units (which start broadcasting when an officer turns on the lights or siren), police radios, light-bar controllers and EMS equipment, over Bluetooth</li>
 <li>Vehicle Wi-Fi routers used by first-responder fleets</li>
-<li>Flock and Raven plate readers and gunshot detectors, plus mapped plate-reader cameras from OpenStreetMap with the direction they face</li>
+<li>Flock and Raven plate readers and gunshot detectors, plus mapped plate-reader, speed and red-light cameras from OpenStreetMap with the direction they face</li>
 <li>AirTags, Tiles, SmartTags and Find Hub tags that travel with you</li>
 <li>With an optional RTL-SDR dongle: police and fire radio transmissions nearby (beta: not yet tested with real hardware, feedback welcome)</li>
 </ul>

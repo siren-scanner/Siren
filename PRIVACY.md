@@ -8,8 +8,8 @@ Siren deletes all of it.
 
 **What goes over the network:**
 - **Map tiles** from OpenStreetMap's tile servers, for the area you're looking at.
-- **Plate-reader locations** from OpenStreetMap's Overpass API, for the area around you, rounded to
-  about 10 km.
+- **Plate-reader locations** (Settings > Plate readers, if on - it's off until you turn it on) from
+  OpenStreetMap's Overpass API, for the area around you, rounded to about 10 km.
 - **Police aircraft** (Settings > Drones & aircraft > Police aircraft, if on) from the free ADS-B feed
   at adsb.lol, every 30 seconds while scanning, for your area rounded to about 10 km.
 - **Flights you look up or track:** the flight number, callsign or tail number goes to adsb.lol, and the

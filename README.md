@@ -78,8 +78,8 @@ audio.
 ## Privacy
 
 See [PRIVACY.md](PRIVACY.md). In short: no accounts, no analytics, no ads. The only network
-requests are map tiles from OpenStreetMap, plate-reader locations from OpenStreetMap's Overpass
-API and, if you turn it on, police aircraft from the adsb.lol ADS-B feed. Lookups only send your
+requests are map tiles from OpenStreetMap and, if you turn them on, plate-reader locations from
+OpenStreetMap's Overpass API and police aircraft from the adsb.lol ADS-B feed. Lookups only send your
 area, rounded to about 10 km.
 
 ## Credits

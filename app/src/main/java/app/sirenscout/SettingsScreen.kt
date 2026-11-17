@@ -41,7 +41,7 @@ import kotlin.math.roundToInt
 private enum class SettingsPage(val title: String, val summary: String) {
     ALERTS("Alerts", "Sounds, signal strength, police following you, unknown trackers"),
     CAMERAS("Plate readers", "Known cameras on the map and alert distance"),
-    AIR("Drones & aircraft (beta)", "Drones' Remote ID, police helicopters and planes"),
+    AIR("Drones & aircraft", "Drones' Remote ID, police helicopters and planes"),
     SCANNING("Scanning", "Auto-optimize, Wi-Fi, screen off, turning things on"),
     MAP("Map", "Your location marker"),
     RADIO("Radio (RF dongle)", "Band watch, frequencies, receiver"),
@@ -224,7 +224,8 @@ private fun CameraSettings() {
     var cameraAlert by remember { mutableFloatStateOf(prefs.cameraAlertM) }
     SettingRow(
         "Known plate-reader cameras",
-        "Shows mapped Flock and other plate readers from OpenStreetMap / DeFlock, and alerts when you're driving toward one.",
+        "Shows mapped Flock and other plate readers from OpenStreetMap / DeFlock, and alerts when you're driving toward one. " +
+            "Downloads camera locations for your area (rounded to about 10 km) from OpenStreetMap, so it needs a data connection.",
         knownCameras,
     ) { knownCameras = it; prefs.knownCameras = it }
     if (!knownCameras) return
@@ -440,27 +441,29 @@ private fun SuggestButtons() {
 
 /** Radio monitoring hasn't been tried with a real dongle yet: say so, and ask for feedback. */
 @Composable
-private fun RfBetaNote() {
+private fun RfBetaNote() = BetaFeedbackNote(
+    "Beta: not yet tested with a real dongle",
+    "Radio monitoring is built but hasn't been tried with an actual RTL-SDR dongle yet. If you try it, " +
+        "you're a beta tester - thank you! Feedback on what works, what doesn't and what could be better " +
+        "is very welcome and helps fix problems and improve it.",
+)
+
+/** A beta feature's note asking for feedback, with a link to the project page. Public edition only. */
+@Composable
+internal fun BetaFeedbackNote(title: String, text: String) {
     if (BuildConfig.REPO_URL.isEmpty()) return // only the public edition asks testers for feedback
     val context = LocalContext.current
     androidx.compose.material3.Card {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Beta: not yet tested with a real dongle", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "Radio monitoring is built but hasn't been tried with an actual RTL-SDR dongle yet. If you try it, " +
-                    "you're a beta tester - thank you! Feedback on what works, what doesn't and what could be better " +
-                    "is very welcome and helps fix problems and improve it.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (BuildConfig.REPO_URL.isNotEmpty()) {
-                TextButton(onClick = {
-                    runCatching {
-                        context.startActivity(
-                            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("${BuildConfig.REPO_URL}/issues/new/choose"))
-                        )
-                    }
-                }) { Text("Send feedback") }
-            }
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(text, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = {
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("${BuildConfig.REPO_URL}/issues/new/choose"))
+                    )
+                }
+            }) { Text("Send feedback") }
         }
     }
 }
@@ -486,21 +489,6 @@ private fun AirSettings() {
     var showAll by remember { mutableStateOf(prefs.airShowAll) }
     val unit = if (usesMiles()) 1f else 1.609f
     var miles by remember { mutableFloatStateOf(prefs.airAlertMiles) }
-    if (BuildConfig.REPO_URL.isNotEmpty()) androidx.compose.material3.Card {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("Beta: new and not yet tested in the field", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "If you try it, you're a beta tester - thank you. Feedback on what it catches, what it misses and what " +
-                    "could be better is very welcome.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            if (BuildConfig.REPO_URL.isNotEmpty()) TextButton(onClick = {
-                runCatching {
-                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("${BuildConfig.REPO_URL}/issues/new/choose")))
-                }
-            }) { Text("Send feedback") }
-        }
-    }
     SettingRow(
         "Drones (Remote ID)",
         "Most drones must broadcast their position, height and often their operator's position over Bluetooth and Wi-Fi. " +

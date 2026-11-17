@@ -21,7 +21,7 @@ feature or report a problem* in the app.
 | Wi-Fi | scan every 31 s (Android's limit) | Cradlepoint, Sierra Wireless AirLink, Peplink and Inseego vehicle routers |
 | Drones (beta) | Bluetooth / Wi-Fi Remote ID | any drone broadcasting FAA Remote ID: serial, position, height, operator position |
 | Police aircraft (beta, online) | adsb.lol ADS-B feed | helicopters and planes registered to police, sheriffs, state patrols and federal law enforcement (FAA registry) |
-| Flights | adsb.lol ADS-B feed | look up and track any flight by number, callsign or tail number, with status notifications |
+| Flights | adsb.lol ADS-B feed | look up and track any flight by number, callsign or tail number, with status notifications; optional US aircraft registry download (FAA) for make, model, year and owner |
 | Radio (optional, beta) | RTL-SDR dongle | transmissions on police / fire bands (Band watch) or on channels you choose |
 
 Axon Signal is the most telling: those units start broadcasting when an officer turns on the
@@ -80,7 +80,8 @@ audio.
 See [PRIVACY.md](PRIVACY.md). In short: no accounts, no analytics, no ads. The only network
 requests are map tiles from OpenStreetMap and, if you turn them on, plate-reader locations from
 OpenStreetMap's Overpass API and police aircraft from the adsb.lol ADS-B feed. Lookups only send your
-area, rounded to about 10 km.
+area, rounded to about 10 km. The optional aircraft registry is a one-off download from this
+project's releases; optional online aircraft details come from hexdb.io.
 
 ## Credits
 

@@ -2,6 +2,10 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.63 · Nov 17, 2026
+- Aircraft details: download the US aircraft registry (about 8 MB, from the FAA's public records) in Settings > Drones & aircraft to see the make and model, year built, engine, seats, owner and home base of US aircraft in flight details, offline. Delete it there any time.
+- Optional online details from hexdb.io (off unless you turn it on) add friendlier type names, the airline flying leased planes, and aircraft from outside the US.
+
 ## 1.0.62 · Nov 16, 2026
 - Distances read naturally: "within 5 ft" instead of "within 5 ft away" in the banner and alerts.
 - Store screenshots added.

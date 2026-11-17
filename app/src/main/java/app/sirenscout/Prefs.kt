@@ -162,6 +162,10 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("air_aircraft", BuildConfig.REPO_URL.isEmpty())
         set(v) = sp.edit().putBoolean("air_aircraft", v).apply()
     /** Also list every other aircraft (no alerts), e.g. to check the feed is working. */
+    /** Ask hexdb.io for aircraft details (online; its data terms aren't clearly open, so opt-in in the public edition). */
+    var hexdbLookups: Boolean
+        get() = sp.getBoolean("hexdb_lookups", !BuildConfig.PUBLIC_EDITION)
+        set(v) = sp.edit().putBoolean("hexdb_lookups", v).apply()
     var airShowAll: Boolean
         get() = sp.getBoolean("air_show_all", false)
         set(v) = sp.edit().putBoolean("air_show_all", v).apply()

@@ -10,6 +10,11 @@ Siren ships lookup tables used to guess who made a device (`app/src/main/assets`
 - `police_aircraft.txt` - aircraft registered to law-enforcement agencies, filtered from the FAA
   aircraft registry (public domain) by `tools/build-police-aircraft.py`.
 
+- The optional aircraft registry download (`aircraft-registry.txt.gz`, attached to each GitHub
+  release) - make, model, year and owner of US aircraft from the FAA aircraft registry (public
+  domain), built by `tools/build-aircraft-registry.py`. Optional online details come from
+  [hexdb.io](https://hexdb.io), only if turned on.
+
 - `airports.txt` - airport codes, names and positions from [OurAirports](https://ourairports.com)
   (public domain), built by `tools/build-airports.py`.
 

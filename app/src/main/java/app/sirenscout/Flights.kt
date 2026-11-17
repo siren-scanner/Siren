@@ -145,13 +145,47 @@ object Flights {
         return "callsign" to q
     }
 
+    /** What's known about an aircraft beyond the live feed. */
+    data class AircraftInfo(
+        val type: String? = null,
+        val owner: String? = null,
+        /** The registered owner when it differs from [owner] (a leasing bank behind an airline, say). */
+        val registeredTo: String? = null,
+        val year: String? = null,
+        val homeBase: String? = null,
+        val engine: String? = null,
+        val seats: Int? = null,
+    )
+
     /**
-     * Full aircraft type and registered owner from hexdb.io, by ICAO address; cached. Not in the
-     * public edition: hexdb.io's data terms aren't clearly open, so it only uses open services.
+     * Type and owner by ICAO address: from the downloaded US registry (offline) and, if allowed,
+     * hexdb.io (online, worldwide, friendlier names). hexdb.io's data terms aren't clearly open,
+     * so the public edition only asks it when the user turns that on.
      */
+    fun aircraftDetails(context: Context, hex: String): AircraftInfo {
+        val reg = AircraftRegistry.lookup(context, hex)
+        val online = if (Prefs(context).hexdbLookups) hexdb(hex) else null to null
+        val owner = online.second ?: reg?.owner
+        return AircraftInfo(
+            type = online.first ?: reg?.model,
+            owner = owner,
+            registeredTo = reg?.owner?.takeIf { online.second != null && !sameName(it, online.second!!) },
+            year = reg?.year,
+            homeBase = reg?.place,
+            engine = reg?.engine,
+            seats = reg?.seats,
+        )
+    }
+
+    private fun sameName(a: String, b: String): Boolean {
+        fun core(s: String) = s.lowercase().replace(Regex("[^a-z0-9 ]"), "").split(' ')
+            .filter { it !in setOf("inc", "llc", "corp", "co", "corporation", "company", "ltd", "the") }.joinToString(" ")
+        return core(a) == core(b) || core(a).startsWith(core(b)) || core(b).startsWith(core(a))
+    }
+
     private val details = java.util.concurrent.ConcurrentHashMap<String, Pair<String?, String?>>()
 
-    fun aircraftDetails(hex: String): Pair<String?, String?> = if (BuildConfig.PUBLIC_EDITION) null to null else details.getOrPut(hex) {
+    private fun hexdb(hex: String): Pair<String?, String?> = details.getOrPut(hex) {
         runCatching {
             val conn = URL("https://hexdb.io/api/v1/aircraft/$hex").openConnection() as HttpURLConnection
             conn.connectTimeout = 10_000

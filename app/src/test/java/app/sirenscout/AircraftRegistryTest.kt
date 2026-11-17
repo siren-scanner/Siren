@@ -66,6 +66,15 @@ class AircraftRegistryTest {
         assertNull(AircraftRegistry.find(dir, "ffffff"))
     }
 
+    @Test fun cachedLookupsHandleAircraftNotInTheRegistry() {
+        AircraftRegistry.unpack(ByteArrayInputStream(gz(sample)), dir)
+        // 1.0.63-test crashed here: a miss was cached as null, which ConcurrentHashMap refuses.
+        assertNull(AircraftRegistry.lookupIn(dir, "400ABC"))
+        assertNull(AircraftRegistry.lookupIn(dir, "400abc"))
+        assertEquals("N123AB", AircraftRegistry.lookupIn(dir, "A12345")!!.tail)
+        assertEquals("N123AB", AircraftRegistry.lookupIn(dir, "a12345")!!.tail)
+    }
+
     @Test fun refusesOtherFiles() {
         assertThrows(IllegalStateException::class.java) {
             AircraftRegistry.unpack(ByteArrayInputStream(gz("<html>Not found</html>\n")), dir)

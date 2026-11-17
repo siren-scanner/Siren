@@ -18,7 +18,7 @@ Repo: https://github.com/siren-scanner/Siren.git
 Builds:
   - versionName: 1.0.61
     versionCode: 63
-    commit: v1.0.61
+    commit: b295b32714294af7cf835a97aea0459c1c3374cd
     subdir: app
     prebuild:
       # Google libraries are only used by the maintainer's own (non-foss) editions.

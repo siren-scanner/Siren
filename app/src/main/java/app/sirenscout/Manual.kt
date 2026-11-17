@@ -254,7 +254,7 @@ private fun ManualContent() {
         "Both show in the Air tab and on the map as purple arrows " +
             "pointing where they're heading. Tap one in the Air tab, or tap its arrow on the map and then its bubble, for " +
             "everything known about it - for aircraft, the live feed's full details (altitude, climb rate, speed, " +
-            "registration, type, owner) and Track & notify; for drones, everything its Remote ID said, including where the " +
+            "registration, type) and Track & notify; for drones, everything its Remote ID said, including where the " +
             "operator is."
     )
     Bullet("Drones: most drones must broadcast Remote ID - their serial number, position, height, speed and often where their operator is standing - over Bluetooth and Wi-Fi. Siren hears it directly, with no internet, typically within a few hundred metres to a mile. The operator's broadcast position shows on the map as a grey dot. The drone's own Bluetooth or Wi-Fi signal also appears in All nearby, labelled Drone (Remote ID) - identified, not a guess, so the on-device AI doesn't look at it.")
@@ -265,7 +265,7 @@ private fun ManualContent() {
 
     Section("Flights")
     Bullet("Air tab > Search & track flights looks up any flight in the world by flight number (AA100), callsign (AAL100) or tail number (N12345), wherever it is - it doesn't need to be near you.")
-    Bullet("It shows the airline, whether it's on the ground, climbing, cruising or descending, altitude and climb rate, the altitude it's heading for, speed, heading, position and distance from you, squawk code and any emergency, the registration, aircraft type and owner. It refreshes every 30 seconds while open. Tap the position to see it on the map.")
+    Bullet("It shows the airline, whether it's on the ground, climbing, cruising or descending, altitude and climb rate, the altitude it's heading for, speed, heading, position and distance from you, squawk code and any emergency, the registration and aircraft type${if (BuildConfig.PUBLIC_EDITION) "" else " and owner"}. It refreshes every 30 seconds while open. Tap the position to see it on the map.")
     Bullet("Your last search stays in the boxes and is looked up again when you come back. Recent searches lists your last 10 flights: tap one to look it up again, Remove takes one off, Clear empties the list.")
     Bullet("Aircraft don't broadcast where they're flying from or to, so enter From and To airport codes (DFW, JFK…) if you know them: Siren then shows distance and time remaining.")
     Bullet("Track & notify follows the flight in the background every minute, even when Siren isn't scanning, and notifies you when it's found, takes off, reaches cruising altitude, starts descending, is about to arrive, lands, comes near you, squawks an emergency, or goes quiet for 10 minutes. It shows on the map in orange. Stop removes it.")

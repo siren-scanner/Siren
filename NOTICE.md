@@ -13,5 +13,5 @@ Siren ships lookup tables used to guess who made a device (`app/src/main/assets`
 - `airports.txt` - airport codes, names and positions from [OurAirports](https://ourairports.com)
   (public domain), built by `tools/build-airports.py`.
 
-Aircraft type and owner details come from [hexdb.io](https://hexdb.io). Live aircraft positions come from [adsb.lol](https://adsb.lol), open data under the Open Database
+Live aircraft positions come from [adsb.lol](https://adsb.lol), open data under the Open Database
 License. Map data © OpenStreetMap contributors, available under the Open Database License.

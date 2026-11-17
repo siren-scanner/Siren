@@ -145,10 +145,13 @@ object Flights {
         return "callsign" to q
     }
 
-    /** Full aircraft type and registered owner from hexdb.io, by ICAO address; cached. */
+    /**
+     * Full aircraft type and registered owner from hexdb.io, by ICAO address; cached. Not in the
+     * public edition: hexdb.io's data terms aren't clearly open, so it only uses open services.
+     */
     private val details = java.util.concurrent.ConcurrentHashMap<String, Pair<String?, String?>>()
 
-    fun aircraftDetails(hex: String): Pair<String?, String?> = details.getOrPut(hex) {
+    fun aircraftDetails(hex: String): Pair<String?, String?> = if (BuildConfig.PUBLIC_EDITION) null to null else details.getOrPut(hex) {
         runCatching {
             val conn = URL("https://hexdb.io/api/v1/aircraft/$hex").openConnection() as HttpURLConnection
             conn.connectTimeout = 10_000

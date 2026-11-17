@@ -14,8 +14,8 @@ android {
         applicationId = "app.sirenscout"
         minSdk = 26
         targetSdk = 35
-        versionCode = 62
-        versionName = "1.0.60"
+        versionCode = 63
+        versionName = "1.0.61"
     }
 
     // Private settings for the maintainer's own builds, kept out of the shared code: the self-update
@@ -61,6 +61,8 @@ android {
         // maintainer's own builds have no feedback buttons.
         buildConfigField("String", "REPO_URL", "\"\"")
         buildConfigField("String", "AUTHOR", "\"$author\"")
+        // The open-source edition only talks to open services (no hexdb.io lookups).
+        buildConfigField("boolean", "PUBLIC_EDITION", "false")
     }
     productFlavors {
         create("stable") {
@@ -88,6 +90,7 @@ android {
             buildConfigField("String", "UPDATE_URL", "\"\"")
             buildConfigField("String", "UPDATE_FALLBACK_URL", "\"\"")
             buildConfigField("String", "REPO_URL", "\"$repoUrl\"")
+            buildConfigField("boolean", "PUBLIC_EDITION", "true")
             buildConfigField("int", "CAR_PORT", "8082")
             buildConfigField("boolean", "TEST_BUILD", "false")
         }

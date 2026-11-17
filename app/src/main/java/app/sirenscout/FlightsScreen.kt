@@ -225,7 +225,8 @@ fun FlightsDialog(
                     HorizontalDivider()
                     Text(
                         "Live data from the free adsb.lol ADS-B feed (volunteer receivers, so remote areas and oceans can have gaps); " +
-                            "aircraft type and owner from hexdb.io. Departure and arrival airports aren't broadcast by aircraft - enter them " +
+                            (if (BuildConfig.PUBLIC_EDITION) "" else "aircraft type and owner from hexdb.io. ") +
+                            "Departure and arrival airports aren't broadcast by aircraft - enter them " +
                             "to see distance and time remaining. Tracked flights are checked every minute on their days, even when Siren isn't " +
                             "scanning, and are dropped after their last day.",
                         style = MaterialTheme.typography.bodySmall, color = Color.Gray,

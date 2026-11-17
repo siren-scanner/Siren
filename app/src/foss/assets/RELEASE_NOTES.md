@@ -2,6 +2,10 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.62 · Nov 16, 2026
+- Distances read naturally: "within 5 ft" instead of "within 5 ft away" in the banner and alerts.
+- Store screenshots added.
+
 ## 1.0.61 · Nov 16, 2026
 - Flight details no longer look up aircraft type and owner from hexdb.io, so Siren only uses open data services. The aircraft type code from the flight feed still shows.
 

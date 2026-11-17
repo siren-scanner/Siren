@@ -22,6 +22,7 @@ object AlertSound {
         RADIO("Public-safety radio transmitting nearby"),
         TRACKER("Unknown tracker traveling with you"),
         CAMERA("Plate reader ahead"),
+        SPEED_CAMERA("Speed or red-light camera ahead"),
         AIR("Drone or police aircraft nearby"),
         OTHER("Other matches (fleet, fire / EMS, surveillance)"),
     }
@@ -38,6 +39,8 @@ object AlertSound {
         Kind.RADIO -> listOf(600.0 to 150, 0.0 to 90, 600.0 to 150)
         Kind.TRACKER -> listOf(1250.0 to 100, 0.0 to 70, 1250.0 to 100, 0.0 to 70, 1250.0 to 100)
         Kind.CAMERA -> listOf(880.0 to 200, 1320.0 to 260)
+        // A "slow down" chime: three bell-like notes stepping down (G, E, C).
+        Kind.SPEED_CAMERA -> listOf(1568.0 to 140, 0.0 to 50, 1319.0 to 140, 0.0 to 50, 1047.0 to 320)
         // A falling "whoosh", like something passing overhead.
         Kind.AIR -> listOf(1100.0 to 120, 900.0 to 120, 700.0 to 160, 0.0 to 120, 1100.0 to 120, 900.0 to 120, 700.0 to 160)
         Kind.OTHER -> listOf(800.0 to 220)
@@ -48,6 +51,7 @@ object AlertSound {
         Kind.RADIO -> prefs.soundRadio
         Kind.TRACKER -> prefs.soundTracker
         Kind.CAMERA -> prefs.soundCamera
+        Kind.SPEED_CAMERA -> prefs.soundSpeedCamera
         Kind.AIR -> prefs.soundAir
         Kind.OTHER -> prefs.soundOther
     }

@@ -404,6 +404,7 @@ private fun AlertSoundSettings() {
                     AlertSound.Kind.RADIO -> prefs.soundRadio = it
                     AlertSound.Kind.TRACKER -> prefs.soundTracker = it
                     AlertSound.Kind.CAMERA -> prefs.soundCamera = it
+                    AlertSound.Kind.SPEED_CAMERA -> prefs.soundSpeedCamera = it
                     AlertSound.Kind.AIR -> prefs.soundAir = it
                     AlertSound.Kind.OTHER -> prefs.soundOther = it
                 }

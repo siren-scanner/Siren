@@ -218,6 +218,9 @@ class Prefs(context: Context) {
     var soundCamera: Boolean
         get() = sp.getBoolean("sound_camera", true)
         set(v) = sp.edit().putBoolean("sound_camera", v).apply()
+    var soundSpeedCamera: Boolean
+        get() = sp.getBoolean("sound_speed_camera", true)
+        set(v) = sp.edit().putBoolean("sound_speed_camera", v).apply()
     var soundAir: Boolean
         get() = sp.getBoolean("sound_air", true)
         set(v) = sp.edit().putBoolean("sound_air", v).apply()

@@ -628,7 +628,7 @@ class ScanService : Service() {
             if (now - (cameraAlertedAt[cam.id] ?: 0L) < CAMERA_REALERT_MS) continue
             cameraAlertedAt[cam.id] = now
             CarDisplay.publishAlert("${cam.label} ahead · ${formatShortDistance(distance)}", facingText(cam, heading))
-            AlertSound.play(this, AlertSound.Kind.CAMERA)
+            AlertSound.play(this, if (cam.kind == CameraKind.PLATE_READER) AlertSound.Kind.CAMERA else AlertSound.Kind.SPEED_CAMERA)
             val n = NotificationCompat.Builder(this, CH_ALERTS)
                 .setSmallIcon(R.drawable.ic_stat_siren)
                 .setContentTitle("${cam.label} ahead · ${formatShortDistance(distance)}")

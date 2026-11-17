@@ -528,7 +528,7 @@ private fun AlertBanner(active: List<Detection>, running: Boolean) {
                     "Emergency equipment nearby (${active.size})",
                     style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White,
                 )
-                val where = if (strongest.source == Source.RF) strongest.id else "${strongest.rssi} dBm, ${distanceText(strongest)} away"
+                val where = if (strongest.source == Source.RF) strongest.id else "${strongest.rssi} dBm, ${away(distanceText(strongest))}"
                 Text("${strongest.signature?.label} - $where", color = Color.White)
             }
         }

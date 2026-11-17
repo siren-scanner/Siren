@@ -53,3 +53,6 @@ fun distanceText(d: Detection, all: Collection<Detection> = Detections.items.val
     if (readings.isEmpty()) return "distance unknown"
     return roughDistance(readings.minOf { estimateMeters(it.rssi, it.source, WifiBands.mhz(it.id)) })
 }
+
+/** "about 40 ft away", but "within 5 ft" and "distance unknown" as they are. */
+fun away(distance: String) = if (distance.startsWith("within") || distance == "distance unknown") distance else "$distance away"

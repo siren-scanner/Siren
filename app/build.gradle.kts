@@ -43,6 +43,10 @@ android {
     }
 
     buildTypes {
+        // Debug builds install alongside as their own app, and can show made-up demo data (DemoMode).
+        debug {
+            applicationIdSuffix = ".demo"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

@@ -766,7 +766,7 @@ class ScanService : Service() {
             },
         )
         val text = if (d.source == Source.RF) "${d.id} · ${d.name}"
-        else "${d.source.label} · ${d.rssi} dBm · ${distanceText(d)} away" + (d.name?.let { " · $it" } ?: "")
+        else "${d.source.label} · ${d.rssi} dBm · ${away(distanceText(d))}" + (d.name?.let { " · $it" } ?: "")
         val n = NotificationCompat.Builder(this, CH_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_siren)
             .setContentTitle("${sig.category.label}: ${sig.label}")

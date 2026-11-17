@@ -149,9 +149,13 @@ class Prefs(context: Context) {
     var airDrones: Boolean
         get() = sp.getBoolean("air_drones", true)
         set(v) = sp.edit().putBoolean("air_drones", v).apply()
-    /** Law-enforcement aircraft from the online ADS-B feed (adsb.lol). On by default in Siren Test only. */
+    /**
+     * Law-enforcement aircraft from the online ADS-B feed (adsb.lol). On by default in the
+     * maintainer's own builds (Siren, Siren Test); opt-in in the public edition, which links to its
+     * project page (REPO_URL), since it fetches from the internet.
+     */
     var airAircraft: Boolean
-        get() = sp.getBoolean("air_aircraft", BuildConfig.TEST_BUILD)
+        get() = sp.getBoolean("air_aircraft", BuildConfig.REPO_URL.isEmpty())
         set(v) = sp.edit().putBoolean("air_aircraft", v).apply()
     /** Also list every other aircraft (no alerts), e.g. to check the feed is working. */
     var airShowAll: Boolean

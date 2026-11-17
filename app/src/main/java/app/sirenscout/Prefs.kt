@@ -61,6 +61,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("known_cameras", BuildConfig.REPO_URL.isEmpty())
         set(v) = sp.edit().putBoolean("known_cameras", v).apply()
 
+    /** Also show and alert for speed and red-light cameras (part of the same download). */
+    var speedCameras: Boolean
+        get() = sp.getBoolean("speed_cameras", true)
+        set(v) = sp.edit().putBoolean("speed_cameras", v).apply()
+
     var cameraAlertM: Float
         get() = sp.getFloat("camera_alert_m", 250f)
         set(v) = sp.edit().putFloat("camera_alert_m", v).apply()

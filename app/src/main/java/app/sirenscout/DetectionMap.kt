@@ -99,6 +99,8 @@ fun DetectionMap(
     var zoom by remember { mutableStateOf(15) }
     val showCameras = remember { Prefs(context).knownCameras }
     val cameras by KnownCameras.cameras.collectAsStateWithLifecycle()
+    val speedCameras = remember { Prefs(context).speedCameras }
+    val wantedCameras = remember(cameras) { cameras.wanted(speedCameras) }
     val cameraLayer = remember { CameraLayer() }
     val airLayer = remember { AirLayer() }
     airLayer.onDetails = onAirDetails
@@ -238,7 +240,7 @@ fun DetectionMap(
     val located = detections.filter { it.lat != null && it.lon != null }
     Box(modifier.clipToBounds()) {
         AndroidView(factory = { mapView }, update = { map ->
-            if (showCameras) cameraLayer.update(map, cameras, zoom)
+            if (showCameras) cameraLayer.update(map, wantedCameras, zoom)
             airLayer.update(map, air)
             // Update markers in place so an open info window survives new scan results.
             val keys = located.mapTo(HashSet()) { it.uid }
@@ -441,7 +443,7 @@ private class AirLayer {
     }
 }
 
-/** Draws known plate readers: a translucent cone for each direction they face, and a pin. */
+/** Draws known cameras: a translucent cone for each direction they face, and a pin. */
 private class CameraLayer {
     private var shown: List<Camera>? = null
     private var shownZoom = -1
@@ -458,7 +460,8 @@ private class CameraLayer {
         )
         map.overlays.removeAll(overlays.toSet())
         overlays.clear()
-        val icon = ContextCompat.getDrawable(map.context, R.drawable.ic_alpr)
+        val plateIcon = ContextCompat.getDrawable(map.context, R.drawable.ic_alpr)
+        val speedIcon = ContextCompat.getDrawable(map.context, R.drawable.ic_speed_camera)
         for (cam in cameras) {
             if (zoom >= MIN_CONE_ZOOM) for (view in cam.views) overlays += cone(map, cam, view, coneLength)
         }
@@ -466,7 +469,7 @@ private class CameraLayer {
             overlays += Marker(map).apply {
                 position = GeoPoint(cam.lat, cam.lon)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                this.icon = icon
+                this.icon = if (cam.kind == CameraKind.PLATE_READER) plateIcon else speedIcon
                 title = cam.label
                 snippet = buildString {
                     append(
@@ -475,7 +478,7 @@ private class CameraLayer {
                     )
                     cam.operator?.let { append("<br>Operated by ").append(it) }
                 }
-                subDescription = "OpenStreetMap / DeFlock"
+                subDescription = cam.source
             }
         }
         // Underneath the location dot and detection pins.
@@ -491,8 +494,9 @@ private class CameraLayer {
             for (i in 0..steps) add(offset(cam.lat, cam.lon, length, start + view.width * i / steps))
             add(GeoPoint(cam.lat, cam.lon))
         }
-        fillPaint.color = 0x4026A69A
-        outlinePaint.color = 0xA026A69A.toInt()
+        val rgb = if (cam.kind == CameraKind.PLATE_READER) 0x26A69A else 0xF9A825
+        fillPaint.color = 0x40000000 or rgb
+        outlinePaint.color = 0xA0000000.toInt() or rgb
         outlinePaint.strokeWidth = 2f
         setOnClickListener { _, _, _ -> false } // taps go to the pin, not the cone
     }

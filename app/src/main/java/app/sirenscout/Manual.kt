@@ -235,19 +235,20 @@ private fun ManualContent() {
     Bullet("Show all zooms to fit every pin and turns the map back to north-up.")
     Bullet("Map tiles come from OpenStreetMap and need a data connection the first time you view an area. Viewed areas are cached.")
 
-    Section("Known plate-reader cameras")
+    Section("Known cameras")
     Para(
         "Siren can show license plate readers that volunteers have mapped in OpenStreetMap, " +
             "mostly through the DeFlock project. This works whether or not the camera gives off any signal."
     )
-    Bullet("It downloads camera locations from the internet (OpenStreetMap), so it needs a data connection${if (BuildConfig.REPO_URL.isNotEmpty()) " and is off until you turn it on in Settings > Plate readers" else ""}. Only your area, rounded to about 10 km, is sent.")
+    Bullet("It downloads camera locations from the internet (OpenStreetMap), so it needs a data connection${if (BuildConfig.REPO_URL.isNotEmpty()) " and is off until you turn it on in Settings > Cameras" else ""}. Only your area, rounded to about 10 km, is sent.")
     Bullet("Cameras appear on the map as teal camera icons. A translucent teal cone shows which way each one faces, as mapped. Where the mapper recorded the camera's exact field of view, the cone is that wide; otherwise it's drawn 50° wide.")
     Bullet("Tap a camera for its maker, the compass direction(s) it faces and who operates it, where known.")
     Bullet("Camera locations are downloaded for about 15 miles (25 km) around you, or around wherever you look on the map, and kept on the phone for a week. Moving to a new area downloads that area. The map-data servers are only told the area, rounded to about 6 miles (10 km), not your exact position.")
     Bullet("While scanning and driving, you get a notification when a camera is ahead of you within the alert distance (default about 800 ft / 250 m). It says how far, and whether the camera faces toward you (it can read your front plate), the way you're going (your rear plate as you pass) or across your path. Each camera alerts at most once every 15 minutes.")
     Bullet("No alerts while you're stopped, since \"ahead\" needs a direction of travel.")
-    Bullet("The map is only as complete as volunteers have made it. Unmapped cameras won't show, and directions can be off. You can add missing cameras at deflock.me.")
-    Bullet("Turn the layer off or change the alert distance in Settings > Plate readers.")
+    Bullet("Speed and red-light cameras mapped in OpenStreetMap show too, as amber speedometer icons (Settings > Cameras > Speed and red-light cameras, on by default). Speed cameras show the limit when it's mapped. Their alerts work the same way: a notification when one is ahead within the alert distance.")
+    Bullet("The map is only as complete as volunteers have made it. Unmapped cameras won't show, and directions can be off; mobile speed cameras and speed vans can't be mapped at all. You can add missing plate readers at deflock.me, and speed cameras in OpenStreetMap.")
+    Bullet("Turn the layer off or change the alert distance in Settings > Cameras.")
 
     Section("Drones and police aircraft")
     Para(
@@ -361,7 +362,7 @@ private fun ManualContent() {
     Bullet("While it's on, the controls it manages are greyed out and show its choice. Turn it off to use your own settings, which are kept.")
 
     Section("Settings reference")
-    Bullet("Settings opens a menu of sections: Alerts, Plate readers, Drones & aircraft, Scanning, Map, Radio, Watch rules & hidden, Car display, Backup sharing & updates, ${if (AiEngine.AVAILABLE_IN_BUILD) "On-device AI, " else ""}and Help & diagnostics. Tap one to open it; the back arrow (or your phone's back gesture) returns to the menu, and Done closes Settings.")
+    Bullet("Settings opens a menu of sections: Alerts, Cameras, Drones & aircraft, Scanning, Map, Radio, Watch rules & hidden, Car display, Backup sharing & updates, ${if (AiEngine.AVAILABLE_IN_BUILD) "On-device AI, " else ""}and Help & diagnostics. Tap one to open it; the back arrow (or your phone's back gesture) returns to the menu, and Done closes Settings.")
     Bullet("Turn on automatically (Bluetooth, Location, Wi-Fi scanning, battery optimization) - all on by default; changes apply from the next prompt.")
     Bullet("Scanning: fast Wi-Fi scans, targeted screen-off scan and keep screen on - all on by default. Fast Wi-Fi and the targeted scan take effect right away; keep screen on applies the next time you press Start.")
     Bullet("Alert signal strength, RF options and the traveling-with-you time and distance apply the next time you press Start.")

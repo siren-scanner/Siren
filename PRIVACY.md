@@ -8,7 +8,7 @@ Siren deletes all of it.
 
 **What goes over the network:**
 - **Map tiles** from OpenStreetMap's tile servers, for the area you're looking at.
-- **Plate-reader locations** (Settings > Plate readers, if on - it's off until you turn it on) from
+- **Camera locations** - plate readers, speed and red-light cameras (Settings > Cameras, if on - it's off until you turn it on) from
   OpenStreetMap's Overpass API, for the area around you, rounded to about 10 km.
 - **Police aircraft** (Settings > Drones & aircraft > Police aircraft, if on) from the free ADS-B feed
   at adsb.lol, every 30 seconds while scanning, for your area rounded to about 10 km.

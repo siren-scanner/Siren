@@ -55,4 +55,39 @@ class KnownCamerasTest {
         assertEquals(40.1, KnownCameras.roundForQuery(40.123456), 0.0)
         assertEquals(-100.1, KnownCameras.roundForQuery(-100.124512), 0.0)
     }
+
+    @Test
+    fun `speed and red-light cameras from nodes and enforcement relations`() {
+        val json = org.json.JSONObject(
+            """{"elements":[
+              {"type":"node","id":1,"lat":40.0,"lon":-100.0,"tags":{"surveillance:type":"ALPR","manufacturer":"Flock Safety"}},
+              {"type":"node","id":2,"lat":40.1,"lon":-100.0,"tags":{"highway":"speed_camera","maxspeed":"45 mph","direction":"90"}},
+              {"type":"node","id":3,"lat":40.2,"lon":-100.0,"tags":{"man_made":"surveillance"}},
+              {"type":"node","id":4,"lat":40.3,"lon":-100.0},
+              {"type":"node","id":5,"lat":40.4,"lon":-100.0},
+              {"type":"node","id":6,"lat":40.5,"lon":-100.0,"tags":{"amenity":"bench"}},
+              {"type":"relation","id":10,"tags":{"type":"enforcement","enforcement":"traffic_signals"},
+               "members":[{"type":"node","ref":3,"role":"device"},{"type":"node","ref":4,"role":"from"}]},
+              {"type":"relation","id":11,"tags":{"type":"enforcement","enforcement":"maxspeed","maxspeed":"50"},
+               "members":[{"type":"node","ref":5,"role":"device"}]}
+            ]}"""
+        )
+        val cams = KnownCameras.parseOverpass(json).associateBy { it.id }
+        assertEquals(setOf(1L, 2L, 3L, 5L), cams.keys) // 4 is only where enforcement starts, 6 isn't a camera
+        assertEquals(CameraKind.PLATE_READER, cams[1]!!.kind)
+        assertEquals("Flock Safety plate reader", cams[1]!!.label)
+        assertEquals("Speed camera · 45 mph limit", cams[2]!!.label)
+        assertEquals(90f, cams[2]!!.views.single().bearing, 0.01f)
+        assertEquals("Red-light camera", cams[3]!!.label)
+        assertEquals("Speed camera · 50 km/h limit", cams[5]!!.label)
+        assertEquals("OpenStreetMap", cams[5]!!.source)
+        assertEquals(listOf(1L), cams.values.toList().wanted(speedCameras = false).map { it.id })
+    }
+
+    @Test
+    fun `speed cameras describe their facing without plate talk`() {
+        val speed = Camera(1, 40.0, -100.0, listOf(CameraView(180f)), null, null, CameraKind.SPEED)
+        assertEquals("facing toward you - checks traffic coming your way", facingText(speed, 0f))
+        assertEquals("at the lights ahead", facingText(speed.copy(kind = CameraKind.RED_LIGHT, views = emptyList()), 0f))
+    }
 }

@@ -40,7 +40,7 @@ import kotlin.math.roundToInt
 
 private enum class SettingsPage(val title: String, val summary: String) {
     ALERTS("Alerts", "Sounds, signal strength, police following you, unknown trackers"),
-    CAMERAS("Plate readers", "Known cameras on the map and alert distance"),
+    CAMERAS("Cameras", "Plate readers, speed and red-light cameras on the map and alert distance"),
     AIR("Drones & aircraft", "Drones' Remote ID, police helicopters and planes"),
     SCANNING("Scanning", "Auto-optimize, Wi-Fi, screen off, turning things on"),
     MAP("Map", "Your location marker"),
@@ -222,13 +222,20 @@ private fun CameraSettings() {
     val prefs = Prefs(LocalContext.current)
     var knownCameras by remember { mutableStateOf(prefs.knownCameras) }
     var cameraAlert by remember { mutableFloatStateOf(prefs.cameraAlertM) }
+    var speedCameras by remember { mutableStateOf(prefs.speedCameras) }
     SettingRow(
-        "Known plate-reader cameras",
+        "Known cameras (online)",
         "Shows mapped Flock and other plate readers from OpenStreetMap / DeFlock, and alerts when you're driving toward one. " +
             "Downloads camera locations for your area (rounded to about 10 km) from OpenStreetMap, so it needs a data connection.",
         knownCameras,
     ) { knownCameras = it; prefs.knownCameras = it }
     if (!knownCameras) return
+    SettingRow(
+        "Speed and red-light cameras",
+        "Also shows (in amber) and alerts for speed cameras and red-light cameras mapped in OpenStreetMap - part of the same " +
+            "download. Coverage depends on volunteers mapping them, so some are missing, especially mobile and new ones.",
+        speedCameras,
+    ) { speedCameras = it; prefs.speedCameras = it }
     if (prefs.autoOptimize) {
         Text(
             "Alert distance is set by Auto-optimize (Scanning): about 15 seconds before you reach a camera at your current speed " +

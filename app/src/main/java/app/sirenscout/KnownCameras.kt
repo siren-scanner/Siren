@@ -23,7 +23,12 @@ data class CameraView(val bearing: Float, val width: Float = DEFAULT_VIEW_WIDTH)
 
 const val DEFAULT_VIEW_WIDTH = 50f
 
-/** A license plate reader mapped in OpenStreetMap (largely by the DeFlock project). */
+enum class CameraKind { PLATE_READER, SPEED, RED_LIGHT }
+
+/**
+ * A camera mapped in OpenStreetMap: plate readers (largely mapped by the DeFlock project), and
+ * speed and red-light cameras.
+ */
 data class Camera(
     val id: Long,
     val lat: Double,
@@ -32,8 +37,22 @@ data class Camera(
     val views: List<CameraView>,
     val maker: String?,
     val operator: String?,
+    val kind: CameraKind = CameraKind.PLATE_READER,
+    /** The speed limit it enforces, as mapped ("45 mph"), for speed cameras. */
+    val maxspeed: String? = null,
 ) {
-    val label get() = maker?.let { "$it plate reader" } ?: "Plate reader"
+    val label get() = when (kind) {
+        CameraKind.PLATE_READER -> maker?.let { "$it plate reader" } ?: "Plate reader"
+        CameraKind.SPEED -> "Speed camera" + (maxspeed?.let { " · ${speedLimitText(it)}" } ?: "")
+        CameraKind.RED_LIGHT -> "Red-light camera"
+    }
+    val source get() = if (kind == CameraKind.PLATE_READER) "OpenStreetMap / DeFlock" else "OpenStreetMap"
+}
+
+/** "45 mph" stays, a bare "50" (km/h in OpenStreetMap) becomes "50 km/h limit". */
+fun speedLimitText(maxspeed: String): String {
+    val v = maxspeed.trim()
+    return if (v.toIntOrNull() != null) "$v km/h limit" else "$v limit"
 }
 
 /** Downloads and caches plate-reader locations around wherever the user is or is looking. */
@@ -60,7 +79,8 @@ object KnownCameras {
     private var nextAttemptAt = 0L
     private val mutex = Mutex()
 
-    private fun file(context: Context) = File(context.filesDir, "known_cameras.json")
+    // v2 added speed and red-light cameras: a new file so areas cached before get downloaded again.
+    private fun file(context: Context) = File(context.filesDir, "known_cameras_v2.json")
 
     /** Fetches cameras around a point unless that area was fetched recently. Safe to call often. */
     suspend fun refreshAround(context: Context, lat: Double, lon: Double) = mutex.withLock {
@@ -93,7 +113,7 @@ object KnownCameras {
     internal fun roundForQuery(deg: Double) = Math.round(deg * 10) / 10.0
 
     private fun fetch(url: String, lat: Double, lon: Double): List<Camera> {
-        val query = """[out:json][timeout:25];node["surveillance:type"="ALPR"](around:$FETCH_RADIUS_M,$lat,$lon);out;"""
+        val query = overpassQuery(lat, lon)
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = "POST"
@@ -111,19 +131,63 @@ object KnownCameras {
         }
     }
 
+    /**
+     * Plate readers, speed cameras (highway=speed_camera) and the devices of speed and red-light
+     * enforcement relations, around a point.
+     */
+    internal fun overpassQuery(lat: Double, lon: Double): String {
+        val around = "(around:$FETCH_RADIUS_M,$lat,$lon)"
+        return "[out:json][timeout:25];" +
+            "(node[\"surveillance:type\"=\"ALPR\"]$around;node[\"highway\"=\"speed_camera\"]$around;)->.cams;" +
+            "rel[\"type\"=\"enforcement\"][\"enforcement\"~\"^(maxspeed|average_speed|traffic_signals)$\"]$around->.rules;" +
+            "node(r.rules:\"device\")->.devices;" +
+            "(.cams;.devices;.rules;);out;"
+    }
+
     fun parseOverpass(json: JSONObject): List<Camera> {
         val elements = json.optJSONArray("elements") ?: return emptyList()
-        return List(elements.length()) { elements.getJSONObject(it) }.mapNotNull { e ->
-            if (e.optString("type") != "node") return@mapNotNull null
+        val all = List(elements.length()) { elements.getJSONObject(it) }
+        // Enforcement relations say what their device nodes enforce, and sometimes the limit.
+        val enforces = HashMap<Long, Pair<CameraKind, String?>>()
+        for (r in all.filter { it.optString("type") == "relation" }) {
+            val tags = r.optJSONObject("tags") ?: continue
+            val kind = when (tags.optString("enforcement")) {
+                "maxspeed", "average_speed" -> CameraKind.SPEED
+                "traffic_signals" -> CameraKind.RED_LIGHT
+                else -> continue
+            }
+            val limit = tags.optString("maxspeed").takeIf { it.isNotBlank() }
+            val members = r.optJSONArray("members") ?: continue
+            for (i in 0 until members.length()) {
+                val m = members.getJSONObject(i)
+                if (m.optString("type") == "node" && m.optString("role") == "device") {
+                    // A red-light camera that also checks speed shows as a red-light camera.
+                    val known = enforces[m.getLong("ref")]
+                    if (known == null || kind == CameraKind.RED_LIGHT) enforces[m.getLong("ref")] = kind to (limit ?: known?.second)
+                }
+            }
+        }
+        return all.mapNotNull { e ->
+            if (e.optString("type") != "node" || !e.has("lat")) return@mapNotNull null
             val tags = e.optJSONObject("tags") ?: JSONObject()
             fun tag(key: String) = tags.optString(key).takeIf { it.isNotBlank() }
+            val id = e.getLong("id")
+            val rule = enforces[id]
+            val kind = when {
+                tag("surveillance:type") == "ALPR" -> CameraKind.PLATE_READER
+                rule != null -> rule.first
+                tag("highway") == "speed_camera" -> CameraKind.SPEED
+                else -> return@mapNotNull null
+            }
             Camera(
-                id = e.getLong("id"),
+                id = id,
                 lat = e.getDouble("lat"),
                 lon = e.getDouble("lon"),
                 views = parseDirections(tag("camera:direction") ?: tag("direction")),
                 maker = tag("manufacturer") ?: tag("brand"),
                 operator = tag("operator"),
+                kind = kind,
+                maxspeed = if (kind == CameraKind.SPEED) tag("maxspeed") ?: rule?.second else null,
             )
         }
     }
@@ -149,6 +213,8 @@ object KnownCameras {
                     },
                     maker = it.optString("maker").takeIf { s -> s.isNotEmpty() },
                     operator = it.optString("operator").takeIf { s -> s.isNotEmpty() },
+                    kind = runCatching { CameraKind.valueOf(it.optString("kind")) }.getOrDefault(CameraKind.PLATE_READER),
+                    maxspeed = it.optString("maxspeed").takeIf { s -> s.isNotEmpty() },
                 )
             }
         }
@@ -162,6 +228,7 @@ object KnownCameras {
                 JSONObject().put("id", it.id).put("lat", it.lat).put("lon", it.lon)
                     .put("views", JSONArray(it.views.map { v -> JSONArray().put(v.bearing.toDouble()).put(v.width.toDouble()) }))
                     .put("maker", it.maker ?: "").put("operator", it.operator ?: "")
+                    .put("kind", it.kind.name).put("maxspeed", it.maxspeed ?: "")
             }))
         file(context).writeText(json.toString())
     }
@@ -214,6 +281,21 @@ enum class Facing(val text: String) {
     ACROSS("facing across your path"),
     UNKNOWN("direction not mapped"),
 }
+
+/** How a camera faces you, in words that fit its kind. */
+fun facingText(camera: Camera, heading: Float?): String {
+    val f = facing(camera, heading)
+    if (camera.kind == CameraKind.PLATE_READER) return f.text
+    return when (f) {
+        Facing.TOWARD -> "facing toward you - checks traffic coming your way"
+        Facing.AWAY -> "facing the way you're going - checks traffic from behind"
+        Facing.ACROSS -> "facing across your path - may be for the cross street"
+        Facing.UNKNOWN -> if (camera.kind == CameraKind.RED_LIGHT) "at the lights ahead" else "direction not mapped"
+    }
+}
+
+/** Which cameras the user wants: plate readers always (when cameras are on), speed and red-light ones if chosen. */
+fun List<Camera>.wanted(speedCameras: Boolean) = if (speedCameras) this else filter { it.kind == CameraKind.PLATE_READER }
 
 /** Which way a camera faces relative to someone traveling on [heading]. */
 fun facing(camera: Camera, heading: Float?): Facing {

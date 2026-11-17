@@ -1,0 +1,1 @@
+Speed and red-light cameras from OpenStreetMap on the map, with alerts. Optional US aircraft registry download for full aircraft details, offline; optional online details from hexdb.io.

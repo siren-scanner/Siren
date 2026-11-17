@@ -606,7 +606,7 @@ class ScanService : Service() {
         checkKnownCameras(loc)
     }
 
-    // --- Known plate readers (OpenStreetMap) ---
+    // --- Known plate readers, speed and red-light cameras (OpenStreetMap) ---
 
     private val cameraAlertedAt = HashMap<Long, Long>()
     private var lastCameraRefresh = 0L
@@ -621,23 +621,23 @@ class ScanService : Service() {
         // Only alert while moving: "ahead" means nothing without a direction of travel.
         val heading = loc.takeIf { it.hasBearing() && it.speed >= 2.5f }?.bearing ?: return
         val ahead = camerasAhead(
-            KnownCameras.cameras.value, loc.latitude, loc.longitude, heading,
+            KnownCameras.cameras.value.wanted(prefs.speedCameras), loc.latitude, loc.longitude, heading,
             AutoTune.cameraAlertM(prefs, loc.speed).toDouble(),
         )
         for ((cam, distance) in ahead) {
             if (now - (cameraAlertedAt[cam.id] ?: 0L) < CAMERA_REALERT_MS) continue
             cameraAlertedAt[cam.id] = now
-            CarDisplay.publishAlert("${cam.label} ahead · ${formatShortDistance(distance)}", facing(cam, heading).text)
+            CarDisplay.publishAlert("${cam.label} ahead · ${formatShortDistance(distance)}", facingText(cam, heading))
             AlertSound.play(this, AlertSound.Kind.CAMERA)
             val n = NotificationCompat.Builder(this, CH_ALERTS)
                 .setSmallIcon(R.drawable.ic_stat_siren)
                 .setContentTitle("${cam.label} ahead · ${formatShortDistance(distance)}")
-                .setContentText(facing(cam, heading).text.replaceFirstChar(Char::uppercase))
+                .setContentText(facingText(cam, heading).replaceFirstChar(Char::uppercase))
                 .setStyle(
                     NotificationCompat.BigTextStyle().bigText(
-                        facing(cam, heading).text.replaceFirstChar(Char::uppercase) +
+                        facingText(cam, heading).replaceFirstChar(Char::uppercase) +
                             (cam.operator?.let { ". Operated by $it." } ?: ".") +
-                            " Location from OpenStreetMap / DeFlock."
+                            " Location from ${cam.source}."
                     )
                 )
                 .setPriority(NotificationCompat.PRIORITY_HIGH)

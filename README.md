@@ -29,7 +29,7 @@ light bar or siren, so the cameras start recording. Routers are low-confidence, 
 utility trucks and businesses use the same hardware.
 
 Other features: a map of where things were seen, with estimated locations for parked devices;
-mapped plate-reader cameras from OpenStreetMap / DeFlock with the direction they face; alerts
+mapped plate-reader cameras from OpenStreetMap / DeFlock, and speed and red-light cameras, with the direction they face; alerts
 when police equipment or a tracker travels with you; your own watch rules; hiding your own
 devices; history with CSV export; alert sounds; a page for your car's browser; and sharing what
 one phone has learned with another.
@@ -78,7 +78,7 @@ audio.
 ## Privacy
 
 See [PRIVACY.md](PRIVACY.md). In short: no accounts, no analytics, no ads. The only network
-requests are map tiles from OpenStreetMap and, if you turn them on, plate-reader locations from
+requests are map tiles from OpenStreetMap and, if you turn them on, camera locations from
 OpenStreetMap's Overpass API and police aircraft from the adsb.lol ADS-B feed. Lookups only send your
 area, rounded to about 10 km. The optional aircraft registry is a one-off download from this
 project's releases; optional online aircraft details come from hexdb.io.

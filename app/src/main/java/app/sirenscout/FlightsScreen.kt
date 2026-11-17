@@ -243,7 +243,7 @@ fun FlightsDialog(
 private fun FlightCard(f: LiveFlight, from: Airport?, to: Airport?, onShowOnMap: (Double, Double, String) -> Unit) {
     val context = LocalContext.current
     val details by androidx.compose.runtime.produceState(Flights.AircraftInfo(), f.hex) {
-        value = withContext(Dispatchers.IO) { Flights.aircraftDetails(context, f.hex) }
+        value = withContext(Dispatchers.IO) { runCatching { Flights.aircraftDetails(context, f.hex) }.getOrDefault(Flights.AircraftInfo()) }
     }
     val me = remember {
         runCatching { context.getSystemService(LocationManager::class.java)?.getLastKnownLocation(LocationManager.GPS_PROVIDER) }.getOrNull()

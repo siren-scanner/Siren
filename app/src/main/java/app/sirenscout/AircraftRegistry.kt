@@ -32,9 +32,8 @@ object AircraftRegistry {
         for (base in listOf(DEFAULT_UPDATE_URL, FALLBACK_UPDATE_URL)) {
             if (base.isNotEmpty()) add(base.removeSuffix("/beta") + "/data/$FILE_NAME")
         }
-        if (BuildConfig.REPO_URL.isNotEmpty() || isEmpty()) {
-            add("https://github.com/siren-scanner/Siren/releases/latest/download/$FILE_NAME")
-        }
+        // Everyone falls back to the project's releases (the maintainer's phones when off Tailscale, say).
+        add("https://github.com/siren-scanner/Siren/releases/latest/download/$FILE_NAME")
     }
 
     private fun dir(context: Context) = File(context.filesDir, "aircraft-registry")
@@ -51,7 +50,9 @@ object AircraftRegistry {
     fun sizeBytes(context: Context): Long = dir(context).listFiles()?.sumOf { it.length() } ?: 0L
 
     @Volatile private var models: Map<Int, Pair<String, Int?>>? = null
-    private val cache = java.util.concurrent.ConcurrentHashMap<String, Entry?>()
+    // ConcurrentHashMap can't hold null, so "not in the registry" is stored as NOT_FOUND.
+    private val NOT_FOUND = Entry("", null, null, null, null, null, null)
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Entry>()
     private val lock = Any()
 
     fun delete(context: Context) = synchronized(lock) {
@@ -154,8 +155,13 @@ object AircraftRegistry {
     /** The registration for this ICAO address, or null if it isn't a US aircraft or the registry isn't downloaded. */
     fun lookup(context: Context, hex: String): Entry? {
         if (!installed(context)) return null
+        return lookupIn(dir(context), hex)
+    }
+
+    /** Cached lookup in an unpacked registry; remembers misses too. */
+    internal fun lookupIn(dir: File, hex: String): Entry? {
         val key = hex.lowercase()
-        return cache.getOrPut(key) { runCatching { find(dir(context), key) }.getOrNull() }
+        return cache.getOrPut(key) { runCatching { find(dir, key) }.getOrNull() ?: NOT_FOUND }.takeIf { it !== NOT_FOUND }
     }
 
     /** Binary search of an unpacked registry in [dir]. */

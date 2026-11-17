@@ -104,7 +104,8 @@ fun DetectionMap(
     airLayer.onDetails = onAirDetails
     var hasLocation by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            // Demo data (debug builds, for screenshots) never shows the real location, nor asks for it.
+            DemoMode.active || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
         )
     }
@@ -120,8 +121,10 @@ fun DetectionMap(
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(15.0)
             val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this)
-            me.enableMyLocation()
-            me.enableFollowLocation()
+            if (!DemoMode.active) {
+                me.enableMyLocation()
+                me.enableFollowLocation()
+            }
             overlays.add(me)
             overlays.add(CopyrightOverlay(context)) // "© OpenStreetMap contributors", required by OSM
             // Any tap closes open popups. Returning false lets a tapped pin still open its own.

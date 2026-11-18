@@ -2,7 +2,7 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
-## 1.0.66 · Nov 17, 2026
+## 1.0.66 · Nov 18, 2026
 - Speed and red-light cameras: mapped ones from OpenStreetMap show on the map as amber speedometer icons (with the limit, where mapped) and alert you when one is ahead with their own three-note chime. Settings > Plate readers is now Settings > Cameras.
 - Aircraft details: download the US aircraft registry (about 8 MB, from the FAA's public records) in Settings > Drones & aircraft to see the make and model, year built, engine, seats, owner and home base of US aircraft in flight details, offline. Delete it there any time.
 - Optional online details from hexdb.io (off unless you turn it on) add friendlier type names, the airline flying leased planes, and aircraft from outside the US.

@@ -535,6 +535,7 @@ class ScanService : Service() {
                 "If it's yours, tap \u201cIt's mine\u201d to mute this kind of tracker for 24 hours.",
             action = muteAction(sigId, d, what),
             sound = AlertSound.Kind.TRACKER,
+            kind = AlertNotify.Kind.TRACKER,
         )
     }
 
@@ -558,6 +559,7 @@ class ScanService : Service() {
         details: String,
         action: NotificationCompat.Action? = null,
         sound: AlertSound.Kind = AlertSound.Kind.POLICE,
+        kind: AlertNotify.Kind = AlertNotify.Kind.FOLLOWING,
     ) {
         AlertSound.play(this, sound)
         CarDisplay.publishAlert(title, text)
@@ -572,8 +574,7 @@ class ScanService : Service() {
             .setGroup("siren-" + DeepLink.Device(d.key).encode())
             .setAutoCancel(true)
             .apply { action?.let(::addAction) }
-            .build()
-        runCatching { NotificationManagerCompat.from(this).notify(followNotificationId(d), n) }
+        AlertNotify.post(this, kind, followNotificationId(d), n)
     }
 
     // --- History ---
@@ -646,8 +647,10 @@ class ScanService : Service() {
             .setGroup("siren-" + DeepLink.Place(cam.lat, cam.lon, cam.label).encode())
                 .setAutoCancel(true)
                 .setTimeoutAfter(60_000)
-                .build()
-            runCatching { NotificationManagerCompat.from(this).notify(CAMERA_ID_BASE + Math.floorMod(cam.id, 1000L).toInt(), n) }
+            AlertNotify.post(
+                this, if (cam.kind == CameraKind.PLATE_READER) AlertNotify.Kind.PLATE_READER else AlertNotify.Kind.SPEED_CAMERA,
+                CAMERA_ID_BASE + Math.floorMod(cam.id, 1000L).toInt(), n,
+            )
         }
     }
 
@@ -719,8 +722,7 @@ class ScanService : Service() {
             .setGroup("siren-" + DeepLink.Air(c.key, c.title).encode())
             .setAutoCancel(true)
             .setTimeoutAfter(10 * 60_000L)
-            .build()
-        runCatching { NotificationManagerCompat.from(this).notify(AIR_ID_BASE + Math.floorMod(c.key.hashCode(), 1000), n) }
+        AlertNotify.post(this, AlertNotify.Kind.AIR, AIR_ID_BASE + Math.floorMod(c.key.hashCode(), 1000), n)
     }
 
     /**
@@ -776,8 +778,7 @@ class ScanService : Service() {
             .setContentIntent(DeepLink.intent(this, DeepLink.Device(d.key)))
             .setGroup("siren-" + DeepLink.Device(d.key).encode())
             .setAutoCancel(true)
-            .build()
-        runCatching { NotificationManagerCompat.from(this).notify(ALERT_ID, n) }
+        AlertNotify.post(this, AlertNotify.forCategory(sig.category), ALERT_ID, n)
     }
 
     private fun ongoingNotification() = NotificationCompat.Builder(this, CH_SERVICE)

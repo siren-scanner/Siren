@@ -4,7 +4,8 @@ import android.content.Context
 import kotlin.math.roundToLong
 
 class Prefs(context: Context) {
-    private val sp = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    companion object { const val FILE = "settings" }
+    private val sp = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
     /** Matches weaker than this (dBm) are listed but don't alert. */
     var rssiThreshold: Int

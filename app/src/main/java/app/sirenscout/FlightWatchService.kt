@@ -110,8 +110,7 @@ class FlightWatchService : Service() {
             .setContentIntent(DeepLink.intent(this, DeepLink.Flight(flightId)))
             .setGroup("siren-" + DeepLink.Flight(flightId).encode() + u.key)
             .setAutoCancel(true)
-            .build()
-        runCatching { NotificationManagerCompat.from(this).notify(UPDATE_ID_BASE + Math.floorMod(u.title.hashCode(), 1000), n) }
+        AlertNotify.post(this, AlertNotify.Kind.FLIGHTS, UPDATE_ID_BASE + Math.floorMod(u.title.hashCode(), 1000), n)
     }
 
     private fun ongoing(text: String): Notification = NotificationCompat.Builder(this, CH_WATCH)

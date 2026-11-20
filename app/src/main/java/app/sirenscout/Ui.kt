@@ -731,7 +731,7 @@ internal fun AutoSwitch(
 @Composable
 internal fun ScanningSettings(prefs: Prefs, auto: Boolean, onAutoChange: (Boolean) -> Unit) {
     val context = LocalContext.current
-    val throttlingOff = remember { wifiThrottlingOff(context) }
+    val throttlingOff = remember { wifiThrottlingOff(context) || WifiThrottle.detectedOff }
     val charging = remember { AutoTune.isCharging(context) }
     Text("Scanning", style = MaterialTheme.typography.titleSmall)
     AutoSwitch(
@@ -745,8 +745,8 @@ internal fun ScanningSettings(prefs: Prefs, auto: Boolean, onAutoChange: (Boolea
     AutoSwitch(
         "Fast Wi-Fi scans when allowed",
         if (throttlingOff) "Wi-Fi scan throttling is off on this phone, so Wi-Fi is scanned every 8 s."
-        else "Wi-Fi scan throttling is on, so Wi-Fi is scanned every 31 s. For every 8 s, turn off " +
-            "Developer options > Wi-Fi scan throttling.",
+        else "Wi-Fi is scanned every 31 s while Android throttles scans. For every 8 s, turn off " +
+            "Developer options > Wi-Fi scan throttling; Siren notices within a few minutes of scanning.",
         prefs.fastWifi,
         locked = if (auto) true else null,
     ) { prefs.fastWifi = it }

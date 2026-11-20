@@ -1,0 +1,1 @@
+Fast Wi-Fi scans (every 8 s) now work when Wi-Fi scan throttling is turned off in Developer options.

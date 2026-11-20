@@ -118,7 +118,7 @@ private fun ManualContent() {
     Para("Four scanners run at the same time:")
     Bullet("BLE (Bluetooth Low Energy) - continuous. Catches body cameras, Axon Signal units, radios, light bar controllers and medical gear.")
     Bullet("Bluetooth (classic) - a discovery pass every 30 seconds. Same kinds of equipment, plus car kits and headsets.")
-    Bullet("Wi-Fi - a scan every 31 seconds (Android's limit), or every 8 seconds if you turn off Developer options > Wi-Fi scan throttling. To find Developer options, tap Settings > About phone > Build number seven times. If a phone refuses fast scans anyway, Siren drops back to 31 seconds by itself. The Wi-Fi status line shows the current interval.")
+    Bullet("Wi-Fi - a scan every 31 seconds (Android's limit), or every 8 seconds if you turn off Developer options > Wi-Fi scan throttling. To find Developer options, tap Settings > About phone > Build number seven times. Siren tries fast scans itself: if the phone refuses one, it drops back to 31 seconds and tries again 10 minutes later. The Wi-Fi status line shows the current interval.")
     Bullet("RF - optional, needs extra hardware. See \"RF monitoring\" below.")
     Para("Built-in signatures, with how sure a match is:")
     Bullet("Axon body cameras, Axon Signal and Fleet - Police, high confidence. Axon Signal units start broadcasting when the light bar or siren is switched on.")

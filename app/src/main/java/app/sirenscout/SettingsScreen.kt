@@ -614,32 +614,21 @@ private fun AutoOffWarning() {
     }
 }
 
-/** Per-alert notifications, and whether each goes to a connected watch. */
+/** Per-alert notification switches. */
 @Composable
 private fun AlertNotifySettings() {
     val context = LocalContext.current
     Text("Notifications", style = MaterialTheme.typography.titleSmall)
     Text(
         "Turn off notifications for alerts you don't need - they still show in Siren's lists, on the car display and " +
-            "with their sound (if on). \u201cAlso on watch\u201d off keeps an alert on the phone only, which saves a " +
-            "watch's battery on busy drives.",
+            "with their sound (if on).",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
     AlertNotify.Kind.entries.forEach { kind ->
         var on by remember { mutableStateOf(AlertNotify.enabled(context, kind)) }
-        var watch by remember { mutableStateOf(AlertNotify.onWatch(context, kind)) }
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(kind.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = on, onCheckedChange = { on = it; AlertNotify.setEnabled(context, kind, it) })
-            }
-            if (on) Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { watch = !watch; AlertNotify.setOnWatch(context, kind, watch) },
-            ) {
-                androidx.compose.material3.Checkbox(checked = watch, onCheckedChange = { watch = it; AlertNotify.setOnWatch(context, kind, it) })
-                Text("Also on watch", style = MaterialTheme.typography.bodySmall)
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(kind.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Switch(checked = on, onCheckedChange = { on = it; AlertNotify.setEnabled(context, kind, it) })
         }
     }
 }

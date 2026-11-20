@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.68 · Nov 20, 2026
+- Notification switches: Settings > Alerts > Notifications lets you turn notifications on or off for each kind of alert. For example, quiet the Flock, Raven and other surveillance sensors that can be frequent while driving. Alerts you turn off still show in Siren's lists, on the car display and with their sound, if that's on.
+
 ## 1.0.66 · Nov 18, 2026
 - Speed and red-light cameras: mapped ones from OpenStreetMap show on the map as amber speedometer icons (with the limit, where mapped) and alert you when one is ahead with their own three-note chime. Settings > Plate readers is now Settings > Cameras.
 - Aircraft details: download the US aircraft registry (about 8 MB, from the FAA's public records) in Settings > Drones & aircraft to see the make and model, year built, engine, seats, owner and home base of US aircraft in flight details, offline. Delete it there any time.

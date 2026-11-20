@@ -5,8 +5,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
 /**
- * Which alerts post a notification, and which of those also go to a connected watch. Sounds have
- * their own switches (AlertSound); an alert that doesn't notify still shows in Siren's lists.
+ * Which alerts post a notification. Sounds have their own switches (AlertSound); an alert that
+ * doesn't notify still shows in Siren's lists.
  */
 object AlertNotify {
     enum class Kind(val label: String) {
@@ -36,17 +36,9 @@ object AlertNotify {
     fun setEnabled(context: Context, kind: Kind, on: Boolean) =
         context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE).edit().putBoolean("notify_${kind.name.lowercase()}", on).apply()
 
-    fun onWatch(context: Context, kind: Kind) =
-        context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE).getBoolean("watch_${kind.name.lowercase()}", true)
-
-    fun setOnWatch(context: Context, kind: Kind, on: Boolean) =
-        context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE).edit().putBoolean("watch_${kind.name.lowercase()}", on).apply()
-
-    /** Posts [builder] as notification [id] if [kind] notifies; kept off watches unless chosen. */
+    /** Posts [builder] as notification [id] if [kind] notifies. */
     fun post(context: Context, kind: Kind, id: Int, builder: NotificationCompat.Builder) {
         if (!enabled(context, kind)) return
-        // "Local only" notifications stay on the phone: Wear OS and other bridges don't copy them.
-        builder.setLocalOnly(!onWatch(context, kind))
         runCatching { NotificationManagerCompat.from(context).notify(id, builder.build()) }
     }
 }

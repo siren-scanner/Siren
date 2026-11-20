@@ -309,25 +309,33 @@ class ScanService : Service() {
 
     // --- Wi-Fi ---
 
-    /** Set once Android refuses fast scans this session (some OEMs throttle regardless). */
-    private var fastWifiRefused = false
+    /** When Android last refused a scan; fast scans are retried a while after. */
+    private var wifiRefusedAt = -1L
     private var wifiEverySeconds = WIFI_INTERVAL_MS / 1000
 
     private fun startWifi() = scope.launch {
         val w = wifi ?: return@launch
-        var failures = 0
+        // Fast scans that went through in a row. Throttled phones refuse the 5th within 2 minutes,
+        // so more than that proves throttling is off, even where the setting can't be read.
+        var fastStreak = 0
         while (isActive) {
+            val now = SystemClock.elapsedRealtime()
             // Re-checked every pass, so flipping the Developer option takes effect without a restart.
-            val fast = AutoTune.fastWifi(prefs) && !fastWifiRefused && wifiThrottlingOff(this@ScanService)
+            val fast = AutoTune.fastWifi(prefs) && (wifiThrottlingOff(this@ScanService) ||
+                WifiThrottle.detectedOff || wifiRefusedAt < 0 || now - wifiRefusedAt > FAST_WIFI_RETRY_MS)
             @Suppress("DEPRECATION") // still the only way to request a scan
             val requested = w.startScan()
-            failures = if (requested) 0 else failures + 1
-            if (fast && failures >= 2) fastWifiRefused = true
-            wifiEverySeconds = (if (fast && !fastWifiRefused) FAST_WIFI_INTERVAL_MS else WIFI_INTERVAL_MS) / 1000
-            if (!requested) {
+            if (requested) {
+                fastStreak = if (fast) fastStreak + 1 else 0
+                if (fastStreak > 4) WifiThrottle.detectedOff = true
+            } else {
+                fastStreak = 0
+                wifiRefusedAt = now
+                if (fast) WifiThrottle.detectedOff = false
                 ScanHealth.wifiRefused()
                 Detections.setStatus { it.copy(wifi = "scan throttled; using passive results") }
             }
+            wifiEverySeconds = (if (fast && requested) FAST_WIFI_INTERVAL_MS else WIFI_INTERVAL_MS) / 1000
             // Android allows 4 scans per 2 minutes for a foreground app unless throttling is off.
             delay(wifiEverySeconds * 1000)
         }
@@ -824,6 +832,8 @@ class ScanService : Service() {
         private const val CLASSIC_INTERVAL_MS = 30_000L
         private const val WIFI_INTERVAL_MS = 31_000L
         private const val FAST_WIFI_INTERVAL_MS = 8_000L
+        /** After a refusal, try fast scans again this much later (the Developer option may have changed). */
+        private const val FAST_WIFI_RETRY_MS = 10 * 60_000L
         /** Exact advertised names worth catching with the screen off (filters can't do patterns). */
         private val SCREEN_OFF_NAMES = listOf("Flock", "Penguin", "Pigvision", "FS Ext Battery")
         private const val LOCATION_MAX_AGE_MS = 60_000L

@@ -268,9 +268,16 @@ class Prefs(context: Context) {
         .distinct()
 }
 
+/** What scanning has found out about Wi-Fi scan throttling, for phones that hide the setting. */
+object WifiThrottle {
+    /** True once 5 fast scans in a row went through; false after a fast scan was refused. */
+    @Volatile var detectedOff = false
+}
+
 /**
  * True when "Wi-Fi scan throttling" is switched off in Developer options. The setting isn't
- * public API, so anything unexpected (missing key, OEM restriction) counts as throttled.
+ * public API, and Android 12+ hides it from most apps, so anything unexpected counts as throttled;
+ * the scanner then finds out by trying (see [WifiThrottle]).
  */
 fun wifiThrottlingOff(context: Context): Boolean = runCatching {
     android.provider.Settings.Global.getInt(context.contentResolver, "wifi_scan_throttle_enabled", 1) == 0

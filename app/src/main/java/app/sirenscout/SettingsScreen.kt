@@ -183,6 +183,16 @@ private fun AlertSettings() {
     Text("Weaker matches are still listed, just without an alert. Applies the next time you press Start.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
     HorizontalDivider()
 
+    var routersAlone by remember { mutableStateOf(prefs.routersAlone) }
+    SettingRow(
+        "Vehicle routers on their own",
+        "Cradlepoint, Sierra AirLink, Peplink and Inseego routers are in police cars, but also in buses, shops and ATMs. Off " +
+            "(recommended): they only alert when their name is a vehicle model's (like IBR900) or police or fire / EMS gear is " +
+            "also nearby, and never once they've been seen in the same place on an earlier day. On: every one alerts.",
+        routersAlone,
+    ) { routersAlone = it; prefs.routersAlone = it }
+    HorizontalDivider()
+
     SettingRow(
         "Police equipment traveling with me",
         "Police signatures seen in most minutes while you're moving.",

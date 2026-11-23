@@ -67,6 +67,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("speed_cameras", true)
         set(v) = sp.edit().putBoolean("speed_cameras", v).apply()
 
+    /** Vehicle routers alert on their own (off: only with a vehicle model name or other police gear nearby). */
+    var routersAlone: Boolean
+        get() = sp.getBoolean("routers_alone", false)
+        set(v) = sp.edit().putBoolean("routers_alone", v).apply()
+
     var cameraAlertM: Float
         get() = sp.getFloat("camera_alert_m", 250f)
         set(v) = sp.edit().putFloat("camera_alert_m", v).apply()

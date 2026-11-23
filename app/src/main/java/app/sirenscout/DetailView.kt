@@ -186,6 +186,7 @@ fun DetailDialog(
                     val time = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                     Info("What it is", sig?.label ?: "No signature match")
                     d.reason?.let { Info("Why it matched", it) }
+                    VehicleRouters.quietReason(androidx.compose.ui.platform.LocalContext.current, d, Detections.items.value.values, System.currentTimeMillis())?.let { Info("Alerts", it) }
                     sig?.let { Info("Category", "${it.category.label} · ${it.confidence.name.lowercase(Locale.US)} confidence") }
                     d.name?.let { Info("Broadcast name", it) }
                     when {

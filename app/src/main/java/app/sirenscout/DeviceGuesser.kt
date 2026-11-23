@@ -221,6 +221,8 @@ object DeviceGuesser {
     )
 
     private val SSID_KINDS = listOf(
+        // Cradlepoint's default names give the model: these are branch, home and IoT routers, not vehicles.
+        "^(E\\d{2,4}|AER\\d{3,4}|CBA\\d{3}|L950|W\\d{4}|S7\\d\\d|MBR\\d{3,4}|CR\\d{4})-[0-9a-f]{3}$" to "business router",
         "^DIRECT-.*(HP|Brother|Canon|EPSON|Xerox)" to "printer",
         "^(HP-Print|EPSON|Brother|Canon_ij)" to "printer",
         "^DIRECT-.*(\\[TV]|Samsung|BRAVIA|LG|Roku|TCL|Hisense)" to "TV",

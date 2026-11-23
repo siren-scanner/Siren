@@ -127,6 +127,7 @@ private fun ManualContent() {
     Bullet("LIFEPAK, ZOLL and Stryker EMS equipment - Fire / EMS, medium.")
     Bullet("Cradlepoint, Sierra Wireless AirLink and Peplink vehicle routers, rugged in-car laptops - Fleet gear, low. Buses, utility trucks and businesses use the same hardware.")
     Bullet("Inseego (Skyus, MiFi) vehicle routers - Fleet gear, low. Also sold as personal hotspots.")
+    Bullet("Because of that, vehicle routers are listed but only alert when it's likely to be a vehicle: their network name is a vehicle model's default (like IBR900-…), or police or fire / EMS gear was also heard in the last 3 minutes. A router seen in the same place on an earlier day is treated as fixed in a building and never alerts. Cradlepoint routers whose names show a shop or office model (E300, AER2200, CBA850 and others) aren't matched at all. Its details say why a router isn't alerting. To have every router alert, turn on Settings > Alerts > Vehicle routers on their own.")
     Bullet("Flock Safety cameras and battery packs (\"Penguin\"), and Raven gunshot detectors - Plate reader / surveillance, medium. These come from community research, not the vendors. Most Flock cameras only talk over cellular and give off nothing a phone can see - the known-camera map below is more reliable.")
 
     Section("Colors")

@@ -480,10 +480,17 @@ class ScanService : Service() {
             ?: WatchRules.match(address, name)
             ?: Signatures.matchWithReason(source, address, name, manufacturerIds, serviceUuids)
             ?: (null to null)
+        val now = System.currentTimeMillis()
+        if (VehicleRouters.isRouter(sig)) VehicleRouters.noteSighting(this, address, currentLocation(), now)
         Detections.record(
             source, address, name, rssi, sig,
             // Trackers pass by constantly in other people's bags; they only alert when they follow you.
-            alertEligible = sig != null && sig.category != Category.TRACKER && rssi >= prefs.rssiThreshold,
+            // Vehicle routers are in buses and shops too, so they need backing up (VehicleRouters).
+            alertEligible = sig != null && sig.category != Category.TRACKER && rssi >= prefs.rssiThreshold &&
+                VehicleRouters.mayAlert(
+                    this, sig, address, name ?: Detections.items.value["${source.name}|$address"]?.name,
+                    Detections.items.value.values, now,
+                ),
             location = currentLocation(),
             guess = guess(),
             reason = reason,

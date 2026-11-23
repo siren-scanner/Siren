@@ -33,6 +33,8 @@ data class Signature(
     /** Advertised BLE service UUIDs, lowercase 128-bit form. */
     val serviceUuids: Set<String> = emptySet(),
     val note: String = "",
+    /** Names that rule a match out, even when the address matches (a maker's non-vehicle models). */
+    val notNames: List<Regex> = emptyList(),
 )
 
 private fun names(vararg patterns: String) = patterns.map { Regex(it, RegexOption.IGNORE_CASE) }
@@ -146,9 +148,11 @@ object Signatures {
             category = Category.FLEET,
             confidence = Confidence.LOW,
             sources = setOf(Source.WIFI),
-            ouis = listOf("00:30:44"),
-            names = names("^IBR[0-9]{3,4}", "^R1900", "^cradlepoint"),
+            ouis = listOf("00:30:44", "00:E0:1C"),
+            names = names("^IBR[0-9]{3,4}", "^R(500|920|980|1900|2100)\\b", "^cradlepoint"),
             note = "Common in police, fire and EMS vehicles, but also buses and businesses.",
+            // Default names of Cradlepoint's branch, home and IoT models: shops, ATMs, signs and kiosks.
+            notNames = names("^(E\\d{2,4}|AER\\d{3,4}|AP\\d{2}|CBA\\d{3}|L950|W\\d{4}|S7\\d\\d|MBR\\d{3,4}|CR\\d{4}|ARC\\b)"),
         ),
         Signature(
             id = "sierra-airlink",
@@ -201,6 +205,7 @@ object Signatures {
     ): Pair<Signature, String>? {
         for (sig in BUILTIN) {
             if (source !in sig.sources) continue
+            if (name != null && sig.notNames.any { it.containsMatchIn(name) }) continue
             sig.ouis.firstOrNull { ouiMatches(source, address, it) }?.let { oui ->
                 val owner = DeviceGuesser.ouiVendor(oui)?.let { ", registered to $it" } ?: ""
                 return sig to "Address starts with $oui$owner"

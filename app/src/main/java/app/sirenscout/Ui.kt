@@ -200,7 +200,8 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
         val matches = visible.filter { it.signature != null }.sortedByDescending { it.lastSeen }
         // Trackers are everywhere in other people's things; they alert only when they follow you.
         val active = matches.filter {
-            it.signature?.category != Category.TRACKER && now - it.lastSeen < Detections.ACTIVE_WINDOW_MS
+            it.signature?.category != Category.TRACKER && now - it.lastSeen < Detections.ACTIVE_WINDOW_MS &&
+                VehicleRouters.mayAlert(context, it, matches, now)
         }
         val tabItems = when (tab) {
             Tab.MATCHES -> matches

@@ -1,0 +1,1 @@
+Fewer false vehicle-router alerts: shop and office Cradlepoint models are ignored, routers fixed in one place stay quiet, and the rest alert only with a vehicle model name or police / EMS gear nearby.

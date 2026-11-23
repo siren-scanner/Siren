@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.70 · Nov 23, 2026
+- Fewer false vehicle-router alerts: Cradlepoint routers named after shop and office models (E300, E3000, AER2200, CBA850…) aren't matched any more, and Cradlepoint, Sierra, Peplink and Inseego routers only alert when their name is a vehicle model's (like IBR900) or police or fire / EMS gear is also nearby. A router seen in the same place on an earlier day is treated as fixed and stays quiet. Settings > Alerts > Vehicle routers on their own brings back the old behavior.
+
 ## 1.0.69 · Nov 20, 2026
 - Fast Wi-Fi scans: with Developer options > Wi-Fi scan throttling turned off, Wi-Fi is now scanned every 8 s. Newer Android versions hide that setting from apps, so Siren used to stay at 31 s; it now tries fast scans itself and drops back to 31 s only if the phone refuses them.
 

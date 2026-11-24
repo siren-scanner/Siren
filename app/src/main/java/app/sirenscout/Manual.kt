@@ -240,7 +240,7 @@ private fun ManualContent() {
     Bullet("Search a place (on the map) finds a town or address anywhere and moves the map there. Siren then downloads what it has for that area - mapped cameras, police and crash data where published - and a card sums up what's within 15 miles. Uses OpenStreetMap's search, which is sent what you type, not your location. Follow me brings the map back to you.")
     Bullet("Full screen shows the map on its own, over everything else; Exit full screen or Back returns.")
     Bullet("Street names hard to read? Settings > Map > Map text size draws the map bigger: Large, Extra large or Largest. Zooming in alone doesn't help, because the names are part of the map pictures and each zoom level draws them the same size.")
-    Bullet("Map tiles come from OpenStreetMap and need a data connection the first time you view an area. Viewed areas are cached.")
+    Bullet("Map tiles come from OpenStreetMap and need a data connection the first time you view an area. Viewed areas are kept on the phone, up to the limit in Settings > Storage (100 MB unless you change it); the oldest go first. Storage also shows and clears the downloaded police, crash and aircraft data.")
 
     Section("Known cameras")
     Para(

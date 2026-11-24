@@ -196,6 +196,19 @@ object PoliceData {
 
     suspend fun ensureLoaded(context: Context) = mutex.withLock { loadLocked(context) }
 
+    fun sizeBytes(context: Context): Long = dir(context).walkTopDown().filter { it.isFile }.sumOf { it.length() }
+
+    /** Forgets downloaded police and crash data (and looked-up addresses); it downloads again when needed. */
+    suspend fun clear(context: Context) = mutex.withLock {
+        dir(context).listFiles()?.filter { it.name != "feeds.json" }?.forEach { it.delete() }
+        _hotspots.value = emptyMap()
+        _live.value = emptyMap()
+        _status.value = emptyMap()
+        lastFetch.clear()
+        failedAt.clear()
+        Geocoder.forget()
+    }
+
     /** Reads the newest feed list from GitHub once a day, so cities can be added without an app update. */
     private fun refreshRegistry(context: Context) {
         val now = System.currentTimeMillis()
@@ -446,6 +459,9 @@ object Geocoder {
 
     @Synchronized
     fun cached(context: Context, address: String, city: String?, state: String?) = load(context)[key(address, city, state)]
+
+    @Synchronized
+    fun forget() { cache = null }
 
     data class Place(val name: String, val lat: Double, val lon: Double)
 

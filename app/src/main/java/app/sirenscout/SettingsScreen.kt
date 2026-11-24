@@ -46,6 +46,7 @@ private enum class SettingsPage(val title: String, val summary: String) {
     AIR("Drones & aircraft", "Drones' Remote ID, police helicopters and planes"),
     SCANNING("Scanning", "Auto-optimize, Wi-Fi, screen off, turning things on"),
     MAP("Map", "Your location marker, map text size"),
+    STORAGE("Storage", "How much map and downloaded data Siren keeps on the phone"),
     RADIO("Radio (RF dongle)", "Band watch, frequencies, receiver"),
     RULES("Watch rules & hidden", "Your own signatures, hidden devices, muted trackers"),
     CAR("Car display", "Show Siren in your car's browser"),
@@ -108,6 +109,7 @@ fun SettingsScreen(onClose: () -> Unit) {
                             HorizontalDivider()
                             MapTextSetting()
                         }
+                        SettingsPage.STORAGE -> StorageSettings()
                         SettingsPage.RADIO -> RadioSettings()
                         SettingsPage.RULES -> {
                             WatchRuleList()
@@ -728,6 +730,77 @@ private fun PoliceDataSettings() {
     Text(
         "Hotspots show where stops happened, not where police are right now. Data comes from each city as published; " +
             "some calls are left out or delayed by the city.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+}
+
+/** What Siren keeps on the phone, and limits for it. */
+@Composable
+private fun StorageSettings() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var limit by remember { mutableStateOf(Prefs(context).mapCacheMb) }
+    var refresh by remember { mutableStateOf(0) }
+    var mapBytes by remember { mutableStateOf(-1L) }
+    var policeBytes by remember { mutableStateOf(-1L) }
+    var registryBytes by remember { mutableStateOf(-1L) }
+    androidx.compose.runtime.LaunchedEffect(refresh) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            mapBytes = MapCache.sizeBytes(context)
+            policeBytes = PoliceData.sizeBytes(context)
+            registryBytes = AircraftRegistry.sizeBytes(context)
+        }
+    }
+    fun mb(b: Long) = when {
+        b < 0 -> "…"
+        b < 1_000_000 -> "%.0f KB".format(b / 1e3)
+        else -> "%.0f MB".format(b / 1e6)
+    }
+    fun background(work: () -> Unit) {
+        scope.launch {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { work() }
+            refresh++
+        }
+    }
+
+    Text("Map pictures", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Areas you've looked at are kept so they load without data next time. Using ${mb(mapBytes)}; when the limit is " +
+            "reached, the oldest go first.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    Text("Keep up to", style = MaterialTheme.typography.bodyMedium)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+        MapCache.SIZES.forEach { size ->
+            androidx.compose.material3.FilterChip(
+                selected = limit == size,
+                onClick = { limit = size; background { MapCache.setLimit(context, size) } },
+                label = { Text("$size MB") },
+            )
+        }
+    }
+    OutlinedButton(onClick = { background { MapCache.clear(context) } }) { Text("Clear map pictures") }
+    HorizontalDivider()
+
+    Text("Police and crash data", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Hotspots, live calls and looked-up addresses for the places you've been: ${mb(policeBytes)}. Cleared data " +
+            "downloads again when you're back in a covered area.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    OutlinedButton(onClick = { scope.launch { PoliceData.clear(context); refresh++ } }) { Text("Clear police and crash data") }
+    HorizontalDivider()
+
+    Text("Aircraft registry", style = MaterialTheme.typography.titleSmall)
+    Text(
+        if (registryBytes == 0L) "Not downloaded (Settings > Drones & aircraft)."
+        else "${mb(registryBytes)} - the optional US aircraft details download.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    if (registryBytes > 0) OutlinedButton(onClick = { background { AircraftRegistry.delete(context) } }) { Text("Delete aircraft registry") }
+    HorizontalDivider()
+    Text(
+        "Your detection history and settings are kept until you delete them (History tab > Delete, or uninstalling Siren).",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
 }

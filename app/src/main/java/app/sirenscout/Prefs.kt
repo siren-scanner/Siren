@@ -100,6 +100,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("live_calls", true)
         set(v) = sp.edit().putBoolean("live_calls", v).apply()
 
+    /** Most the saved map pictures may take up, in MB (Settings > Storage). */
+    var mapCacheMb: Int
+        get() = sp.getInt("map_cache_mb", MapCache.DEFAULT_MB)
+        set(v) = sp.edit().putInt("map_cache_mb", v).apply()
+
     var cameraAlertM: Float
         get() = sp.getFloat("camera_alert_m", 250f)
         set(v) = sp.edit().putFloat("camera_alert_m", v).apply()

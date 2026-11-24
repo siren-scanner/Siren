@@ -129,11 +129,7 @@ fun DetectionMap(
         )
     }
     val (mapView, me) = remember {
-        Configuration.getInstance().apply {
-            userAgentValue = context.packageName // required by the OSM tile servers
-            osmdroidBasePath = File(context.cacheDir, "osmdroid")
-            osmdroidTileCache = File(osmdroidBasePath, "tiles")
-        }
+        MapCache.configure(context)
         MapView(context).run {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)

@@ -72,6 +72,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("routers_alone", false)
         set(v) = sp.edit().putBoolean("routers_alone", v).apply()
 
+    /** Map turns so the direction of travel points up while following (off: always north up). */
+    var mapHeadingUp: Boolean
+        get() = sp.getBoolean("map_heading_up", true)
+        set(v) = sp.edit().putBoolean("map_heading_up", v).apply()
+
     var cameraAlertM: Float
         get() = sp.getFloat("camera_alert_m", 250f)
         set(v) = sp.edit().putFloat("camera_alert_m", v).apply()

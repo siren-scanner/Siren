@@ -10,6 +10,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -104,6 +105,8 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var sourceFilter by rememberSaveable { mutableStateOf<Source?>(null) }
         var showMap by rememberSaveable { mutableStateOf(false) }
+        /** The map on its own page, over everything else. */
+        var mapFull by rememberSaveable { mutableStateOf(false) }
         val ctx = LocalContext.current
         var hideEveryday by remember { mutableStateOf(Prefs(ctx).hideEveryday) }
         var confirmClearHistory by remember { mutableStateOf(false) }
@@ -358,6 +361,15 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
 
         Scaffold { padding ->
             if (showMap) {
+                if (mapFull) FullScreenPage(onDismiss = { mapFull = false }) {
+                    androidx.compose.material3.Surface(Modifier.fillMaxSize()) {
+                        DetectionMap(
+                            shown, Modifier.fillMaxSize().systemBarsPadding(), air = onMap,
+                            onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it },
+                            fullScreen = true, onFullScreen = { mapFull = false },
+                        )
+                    }
+                }
                 val missingFix: @Composable () -> Unit = {
                     val located = shown.count { it.lat != null }
                     if (located < shown.size) {
@@ -381,7 +393,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                                 sourceRow()
                                 missingFix()
                             }
-                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it }, onFullScreen = { mapFull = true })
                         }
                     } else {
                         Column(
@@ -394,7 +406,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                             tabRow()
                             sourceRow()
                             missingFix()
-                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it })
+                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it }, onFullScreen = { mapFull = true })
                         }
                     }
                 }

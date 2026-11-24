@@ -235,6 +235,8 @@ private fun ManualContent() {
     Bullet("The map follows you and, once you're moving faster than about 6 mph (10 km/h), turns so your direction of travel points up. It keeps its direction while you're stopped.")
     Bullet("Dragging the map pauses following. Tap Follow me to resume.")
     Bullet("Show all zooms to fit every pin and turns the map back to north-up.")
+    Bullet("The button at the top left switches between Heading up (while following you, the map turns so the way you're going points up) and North up (the map never turns). Siren remembers your choice.")
+    Bullet("Full screen shows the map on its own, over everything else; Exit full screen or Back returns.")
     Bullet("Map tiles come from OpenStreetMap and need a data connection the first time you view an area. Viewed areas are cached.")
 
     Section("Known cameras")

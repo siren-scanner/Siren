@@ -86,8 +86,12 @@ fun DetectionMap(
     onAirDetails: (AirContact) -> Unit = {},
     onDetails: (Detection) -> Unit = {},
     onHide: (Detection) -> Unit = {},
+    /** Shown in a page of its own: the button then leaves full screen instead of entering it. */
+    fullScreen: Boolean = false,
+    onFullScreen: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    var headingUp by remember { mutableStateOf(Prefs(context).mapHeadingUp) }
     val markers = remember { mutableMapOf<String, Marker>() }
     /** The pin whose card is showing, by detection uid. */
     val selectedState = remember { mutableStateOf<String?>(null) }
@@ -122,7 +126,7 @@ fun DetectionMap(
             setMultiTouchControls(true)
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(15.0)
-            val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this)
+            val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this) { Prefs(context).mapHeadingUp }
             if (!DemoMode.active) {
                 me.enableMyLocation()
                 me.enableFollowLocation()
@@ -284,6 +288,24 @@ fun DetectionMap(
             }
             map.invalidate()
         })
+        Column(
+            Modifier.align(Alignment.TopStart).padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            FilledTonalButton(
+                onClick = {
+                    headingUp = !headingUp
+                    Prefs(context).mapHeadingUp = headingUp
+                    if (!headingUp) mapView.mapOrientation = 0f
+                    else me.lastFreshBearing()?.let { if (me.isFollowLocationEnabled) mapView.mapOrientation = -it }
+                },
+                contentPadding = small,
+            ) { Text(if (headingUp) "\u2191 Heading up" else "N\u2191 North up") }
+            onFullScreen?.let { open ->
+                FilledTonalButton(onClick = open, contentPadding = small) { Text(if (fullScreen) "Exit full screen" else "Full screen") }
+            }
+        }
         if (located.isNotEmpty()) {
             FilledTonalButton(
                 onClick = {
@@ -333,6 +355,7 @@ fun DetectionMap(
                 onClick = {
                     me.enableFollowLocation()
                     following = true
+                    if (!headingUp) mapView.mapOrientation = 0f
                     if (mapView.zoomLevelDouble < 15.0) mapView.controller.setZoom(16.0)
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
@@ -524,18 +547,33 @@ private fun time(context: android.content.Context, millis: Long) =
  * Location overlay that, while following, turns the map so the direction of travel points up.
  * GPS bearing is noise when standing still, so the last heading is kept below walking-ish speed.
  */
-private class HeadingUpLocationOverlay(provider: IMyLocationProvider, private val map: MapView) :
-    MyLocationNewOverlay(provider, map) {
+private class HeadingUpLocationOverlay(
+    provider: IMyLocationProvider,
+    private val map: MapView,
+    private val headingUp: () -> Boolean,
+) : MyLocationNewOverlay(provider, map) {
+    private var bearing: Float? = null
+    private var bearingAt = 0L
+
     override fun onLocationChanged(location: Location?, source: IMyLocationProvider?) {
         super.onLocationChanged(location, source)
-        if (location == null || !isFollowLocationEnabled) return
-        if (location.hasBearing() && location.speed >= MIN_HEADING_SPEED_MPS) {
-            map.post { map.mapOrientation = -location.bearing }
-        }
+        if (location == null) return
+        // Only a fresh fix while moving gives a real heading. The first fix after the map opens
+        // (or the phone turns sideways) can be an old cached one, whose heading would turn the
+        // map to wherever you were driving last - that left the map stuck rotated.
+        val ageMs = (android.os.SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000
+        if (ageMs > MAX_FIX_AGE_MS || !location.hasBearing() || location.speed < MIN_HEADING_SPEED_MPS) return
+        bearing = location.bearing
+        bearingAt = android.os.SystemClock.elapsedRealtime()
+        if (isFollowLocationEnabled && headingUp()) map.post { map.mapOrientation = -location.bearing }
     }
+
+    /** The heading from the last minute, if moving. */
+    fun lastFreshBearing(): Float? = bearing?.takeIf { android.os.SystemClock.elapsedRealtime() - bearingAt < 60_000 }
 
     companion object {
         private const val MIN_HEADING_SPEED_MPS = 2.5f // ~5.6 mph
+        private const val MAX_FIX_AGE_MS = 10_000L
     }
 }
 

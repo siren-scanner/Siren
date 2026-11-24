@@ -20,7 +20,8 @@ Siren ships lookup tables used to guess who made a device (`app/src/main/assets`
 
 Police call data comes from cities' open-data portals, as listed in
 `app/src/main/assets/police_feeds.json`: the City of New Orleans (NOPD calls for service; not for
-commercial use) and the City of Dallas (Dallas Police active calls). Addresses are placed on the map
+commercial use), the City of Dallas (Dallas Police active calls) and the Utah Department of
+Transportation (crash locations). Addresses are placed on the map
 with OpenStreetMap's Nominatim search.
 
 Live aircraft positions come from [adsb.lol](https://adsb.lol), open data under the Open Database

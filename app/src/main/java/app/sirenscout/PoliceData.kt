@@ -46,7 +46,20 @@ object PoliceData {
         val updated: String,
         val source: String,
         val sourceUrl: String,
-    )
+        /** "socrata" or "arcgis" (an ArcGIS map service, e.g. UDOT's crash locations). */
+        val type: String = "socrata",
+        /** ArcGIS: the MapServer address and the layers to read (newest first). */
+        val url: String? = null,
+        val layers: List<Int> = emptyList(),
+        /** ArcGIS feeds cover a whole state: south, north, west, east. Downloaded a piece at a time. */
+        val bounds: List<Double>? = null,
+        /** "stops" (traffic stops) or "crashes". */
+        val kind: String = "stops",
+        val timezone: String? = null,
+    ) {
+        fun covers(lat: Double, lon: Double) = bounds?.let { (s, n, w, e) -> lat in s..n && lon in w..e }
+            ?: (Odometer.distanceM(lat, lon, this.lat, this.lon) <= radiusKm * 1000)
+    }
 
     data class Hotspot(
         val feedId: String,
@@ -55,10 +68,13 @@ object PoliceData {
         val count: Int,
         /** "7-9 AM" when most stops there fall in one two-hour window. */
         val peak: String?,
-        val days: Int,
+        /** "in the last 90 days", "in 2024-2025". */
+        val period: String,
         val what: String,
+        val kind: String = "stops",
     ) {
         val id get() = "$feedId|%.5f|%.5f".format(java.util.Locale.US, lat, lon)
+        val isCrashes get() = kind == "crashes"
     }
 
     data class LiveCall(
@@ -112,15 +128,16 @@ object PoliceData {
         fun JSONObject.list(k: String) = optJSONArray(k)?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList()
         return List(arr.length()) { arr.getJSONObject(it) }.mapNotNull { f ->
             runCatching {
-                if (f.optString("type") != "socrata") return@mapNotNull null // the only kind Siren reads so far
+                val type = f.optString("type")
+                if (type != "socrata" && type != "arcgis") return@mapNotNull null // kinds Siren can't read yet
                 Feed(
                     id = f.getString("id"),
                     name = f.getString("name"),
-                    lat = f.getDouble("lat"),
-                    lon = f.getDouble("lon"),
+                    lat = f.optDouble("lat", 0.0),
+                    lon = f.optDouble("lon", 0.0),
                     radiusKm = f.optDouble("radiusKm", 30.0),
-                    domain = f.getString("domain"),
-                    datasets = f.list("datasets").ifEmpty { return@mapNotNull null },
+                    domain = f.optString("domain"),
+                    datasets = f.list("datasets").ifEmpty { if (type == "socrata") return@mapNotNull null else emptyList() },
                     live = f.optString("mode") == "live",
                     timeField = f.str("timeField"),
                     pointField = f.str("pointField"),
@@ -134,8 +151,14 @@ object PoliceData {
                     state = f.str("state"),
                     updated = f.optString("updated", ""),
                     source = f.optString("source", f.getString("name")),
-                    sourceUrl = f.optString("sourceUrl", "https://${f.getString("domain")}"),
-                )
+                    sourceUrl = f.optString("sourceUrl", "https://${f.optString("domain")}"),
+                    type = type,
+                    url = f.str("url"),
+                    layers = f.optJSONArray("layers")?.let { a -> List(a.length()) { a.getInt(it) } } ?: emptyList(),
+                    bounds = f.optJSONArray("bounds")?.let { a -> List(a.length()) { a.getDouble(it) } }?.takeIf { it.size == 4 },
+                    kind = f.optString("kind", "stops"),
+                    timezone = f.str("timezone"),
+                ).also { if (type == "arcgis" && (it.url == null || it.layers.isEmpty() || it.bounds == null)) return@mapNotNull null }
             }.getOrNull()
         }
     }
@@ -149,21 +172,23 @@ object PoliceData {
         _feeds.value = runCatching { parseRegistry(text) }.getOrElse {
             parseRegistry(context.assets.open("police_feeds.json").bufferedReader().use { it.readText() })
         }
-        // Saved hotspots and status from earlier downloads.
+        // Saved hotspots from earlier downloads: "<feed>.json", or "<feed>@<area>.json" for statewide feeds.
         val spots = HashMap<String, List<Hotspot>>()
-        for (feed in _feeds.value.filter { !it.live }) {
-            val f = File(dir(context), "${feed.id}.json")
-            if (!f.exists()) continue
+        val byId = _feeds.value.associateBy { it.id }
+        for (f in dir(context).listFiles().orEmpty()) {
+            val key = f.name.removeSuffix(".json")
+            val feed = byId[key.substringBefore('@')]?.takeIf { !it.live } ?: continue
             runCatching {
                 val j = JSONObject(f.readText())
-                lastFetch[feed.id] = j.getLong("at")
+                lastFetch[key] = j.getLong("at")
+                val period = j.optString("period", "in the last ${feed.days} days")
                 val a = j.getJSONArray("hotspots")
-                spots[feed.id] = List(a.length()) { i ->
+                spots[key] = List(a.length()) { i ->
                     a.getJSONArray(i).let { h ->
-                        Hotspot(feed.id, h.getDouble(0), h.getDouble(1), h.getInt(2), h.optString(3).ifEmpty { null }, feed.days, feed.what)
+                        Hotspot(feed.id, h.getDouble(0), h.getDouble(1), h.getInt(2), h.optString(3).ifEmpty { null }, period, feed.what, feed.kind)
                     }
                 }
-                setStatus(feed.id, "${spots[feed.id]!!.size} hotspots · updated ${ago(lastFetch[feed.id]!!)}")
+                setStatus(feed.id, "${spots[key]!!.size} hotspots · updated ${ago(lastFetch[key]!!)}")
             }
         }
         _hotspots.value = spots
@@ -194,33 +219,39 @@ object PoliceData {
         refreshRegistry(context)
         val now = System.currentTimeMillis()
         for (feed in _feeds.value) {
-            if (Odometer.distanceM(lat, lon, feed.lat, feed.lon) > feed.radiusKm * 1000) {
+            if (!feed.covers(lat, lon)) {
                 // Left the city: its live calls are no longer useful (hotspots stay for the map).
                 if (feed.live && _live.value.containsKey(feed.id)) _live.value = _live.value - feed.id
                 continue
             }
             if (feed.live && !liveCalls) continue
-            if (now - (failedAt[feed.id] ?: 0L) < RETRY_AFTER_FAILURE_MS) continue
+            // Statewide feeds come a piece at a time: the area around you, rounded to 0.2 degrees.
+            val (tileLat, tileLon) = tile(lat) to tile(lon)
+            val key = if (feed.bounds != null) "${feed.id}@$tileLat,$tileLon" else feed.id
+            if (now - (failedAt[key] ?: 0L) < RETRY_AFTER_FAILURE_MS) continue
             val due = if (feed.live) LIVE_EVERY_MS else HISTORY_MAX_AGE_MS
-            if (now - (lastFetch[feed.id] ?: 0L) < due) continue
-            runCatching { if (feed.live) fetchLive(context, feed) else fetchHistory(context, feed) }
-                .onSuccess { lastFetch[feed.id] = now; failedAt.remove(feed.id) }
+            if (now - (lastFetch[key] ?: 0L) < due) continue
+            runCatching { if (feed.live) fetchLive(context, feed) else fetchHistory(context, feed, key, tileLat, tileLon) }
+                .onSuccess { lastFetch[key] = now; failedAt.remove(key) }
                 .onFailure {
-                    failedAt[feed.id] = now
+                    failedAt[key] = now
                     setStatus(feed.id, "Download failed (${it.message ?: it.javaClass.simpleName}) - will retry")
-                    AppLog.w("Police data ${feed.id} failed", it)
+                    AppLog.w("Police data $key failed", it)
                 }
         }
     }
 
-    private fun fetchHistory(context: Context, feed: Feed) {
-        val stops = downloadStops(feed)
-        val spots = aggregate(feed, stops)
-        _hotspots.value = _hotspots.value + (feed.id to spots)
-        val j = JSONObject().put("at", System.currentTimeMillis()).put("hotspots", JSONArray(spots.map {
+    internal fun tile(deg: Double) = Math.round(deg * 5) / 5.0
+
+    private fun fetchHistory(context: Context, feed: Feed, key: String, tileLat: Double, tileLon: Double) {
+        val (stops, period) = if (feed.type == "arcgis") downloadArcgis(feed, tileLat, tileLon)
+        else downloadStops(feed) to "in the last ${feed.days} days"
+        val spots = aggregate(feed, stops, period)
+        _hotspots.value = _hotspots.value + (key to spots)
+        val j = JSONObject().put("at", System.currentTimeMillis()).put("period", period).put("hotspots", JSONArray(spots.map {
             JSONArray().put(it.lat).put(it.lon).put(it.count).put(it.peak ?: "")
         }))
-        File(dir(context), "${feed.id}.json").writeText(j.toString())
+        File(dir(context), "$key.json").writeText(j.toString())
         setStatus(feed.id, "${spots.size} hotspots from ${stops.size} ${feed.what} · updated just now")
         AppLog.i("Police data ${feed.id}: ${stops.size} ${feed.what} -> ${spots.size} hotspots")
     }
@@ -244,6 +275,48 @@ object PoliceData {
             }
         }
         return stops
+    }
+
+    /**
+     * Crashes (or other points) from an ArcGIS map service in a box around a 0.2-degree tile,
+     * from the feed's layers, with the years they cover ("in 2024-2025").
+     */
+    internal fun downloadArcgis(feed: Feed, tileLat: Double, tileLon: Double): Pair<List<Triple<Double, Double, Int>>, String> {
+        val zone = java.time.ZoneId.of(feed.timezone ?: "UTC")
+        val time = feed.timeField ?: error("no time field")
+        val pts = ArrayList<Triple<Double, Double, Int>>()
+        val years = java.util.TreeSet<Int>()
+        for (layer in feed.layers) {
+            var offset = 0
+            while (offset < 40_000) {
+                val q = mapOf(
+                    "where" to (feed.where ?: "1=1"),
+                    "geometry" to "${tileLon - 0.2},${tileLat - 0.2},${tileLon + 0.2},${tileLat + 0.2}",
+                    "geometryType" to "esriGeometryEnvelope", "inSR" to "4326", "outSR" to "4326",
+                    "spatialRel" to "esriSpatialRelIntersects", "outFields" to time,
+                    "resultOffset" to "$offset", "resultRecordCount" to "2000", "f" to "json",
+                ).entries.joinToString("&") { (k, v) -> "$k=" + URLEncoder.encode(v, "UTF-8") }
+                val j = JSONObject(get("${feed.url}/$layer/query?$q"))
+                j.optJSONObject("error")?.let { error(it.optString("message", "map service error")) }
+                val fs = j.optJSONArray("features") ?: break
+                for (i in 0 until fs.length()) {
+                    val f = fs.getJSONObject(i)
+                    val g = f.optJSONObject("geometry") ?: continue
+                    val ms = f.optJSONObject("attributes")?.optLong(time) ?: 0L
+                    val local = java.time.Instant.ofEpochMilli(ms).atZone(zone)
+                    if (ms > 0) years += local.year
+                    pts += Triple(g.getDouble("y"), g.getDouble("x"), if (ms > 0) local.hour else -1)
+                }
+                if (!j.optBoolean("exceededTransferLimit")) break
+                offset += fs.length()
+            }
+        }
+        val period = when {
+            years.isEmpty() -> "in the latest data"
+            years.first() == years.last() -> "in ${years.first()}"
+            else -> "in ${years.first()}-${years.last()}"
+        }
+        return pts to period
     }
 
     internal fun downloadLiveRows(feed: Feed) = JSONArray(socrata(feed.domain, feed.datasets.first(), mapOf("\$limit" to "2000")))
@@ -300,15 +373,15 @@ object PoliceData {
     // --- Hotspots ---
 
     /** Groups stops into about-a-block cells and keeps the busy ones, busiest first. */
-    internal fun aggregate(feed: Feed, stops: List<Triple<Double, Double, Int>>): List<Hotspot> {
+    internal fun aggregate(feed: Feed, stops: List<Triple<Double, Double, Int>>, period: String = "in the last ${feed.days} days"): List<Hotspot> {
         if (stops.isEmpty()) return emptyList()
         val dLat = CELL_M / 111_320.0
-        val dLon = CELL_M / (111_320.0 * cos(Math.toRadians(feed.lat)))
+        val dLon = CELL_M / (111_320.0 * cos(Math.toRadians(stops[0].first)))
         val cells = stops.groupBy { (lat, lon, _) -> Math.floorDiv((lat / dLat).toLong(), 1L) to Math.floorDiv((lon / dLon).toLong(), 1L) }
         return cells.values.filter { it.size >= MIN_STOPS }.map { pts ->
             Hotspot(
                 feed.id, pts.sumOf { it.first } / pts.size, pts.sumOf { it.second } / pts.size, pts.size,
-                peakHours(pts.map { it.third }), feed.days, feed.what,
+                peakHours(pts.map { it.third }), period, feed.what, feed.kind,
             )
         }.sortedByDescending { it.count }.take(MAX_HOTSPOTS_PER_FEED)
     }

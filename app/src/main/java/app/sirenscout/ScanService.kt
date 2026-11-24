@@ -636,32 +636,36 @@ class ScanService : Service() {
             val live = prefs.liveCalls
             scope.launch(Dispatchers.IO) { PoliceData.refreshAround(this@ScanService, loc.latitude, loc.longitude, live) }
         }
-        if (!prefs.hotspotAlerts) return
+        if (!prefs.hotspotAlerts && !prefs.crashAlerts) return
         // Only while driving: "ahead" needs a direction, and walkers don't get pulled over.
         val heading = loc.takeIf { it.hasBearing() && it.speed >= 5f }?.bearing ?: return
         val all = PoliceData.hotspots.value.values.flatten()
+            .filter { if (it.isCrashes) prefs.crashAlerts else prefs.hotspotAlerts }
         if (all.isEmpty()) return
-        val ahead = PoliceData.hotspotsAhead(
-            all, loc.latitude, loc.longitude, heading, AutoTune.cameraAlertM(prefs, loc.speed).toDouble().coerceAtLeast(200.0), HOTSPOT_ALERT_MIN,
-        )
-        val (spot, distance) = ahead.firstOrNull { now - (hotspotAlertedAt[it.first.id] ?: 0L) > HOTSPOT_REALERT_MS } ?: return
+        val radius = AutoTune.cameraAlertM(prefs, loc.speed).toDouble().coerceAtLeast(200.0)
+        val ahead = PoliceData.hotspotsAhead(all.filter { !it.isCrashes }, loc.latitude, loc.longitude, heading, radius, HOTSPOT_ALERT_MIN) +
+            PoliceData.hotspotsAhead(all.filter { it.isCrashes }, loc.latitude, loc.longitude, heading, radius, CRASH_ALERT_MIN)
+        val (spot, distance) = ahead.sortedBy { it.second }
+            .firstOrNull { now - (hotspotAlertedAt[it.first.id] ?: 0L) > HOTSPOT_REALERT_MS } ?: return
         hotspotAlertedAt[spot.id] = now
-        val title = "Traffic-stop hotspot ahead · ${formatShortDistance(distance)}"
-        val text = "${spot.count} ${spot.what} here in the last ${spot.days} days" + (spot.peak?.let { ", most around $it" } ?: "")
+        val title = (if (spot.isCrashes) "Crash hotspot ahead · " else "Traffic-stop hotspot ahead · ") + formatShortDistance(distance)
+        val text = "${spot.count} ${spot.what} here ${spot.period}" + (spot.peak?.let { ", most around $it" } ?: "")
         CarDisplay.publishAlert(title, text)
         AlertSound.play(this, AlertSound.Kind.SPEED_CAMERA)
         val n = NotificationCompat.Builder(this, CH_ALERTS)
             .setSmallIcon(R.drawable.ic_stat_siren)
             .setContentTitle(title)
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText("$text. From the city's published police call data."))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(
+                "$text. From " + (PoliceData.feeds.value.firstOrNull { it.id == spot.feedId }?.source ?: "published public data") + "."
+            ))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
-            .setContentIntent(DeepLink.intent(this, DeepLink.Place(spot.lat, spot.lon, "Traffic-stop hotspot")))
+            .setContentIntent(DeepLink.intent(this, DeepLink.Place(spot.lat, spot.lon, if (spot.isCrashes) "Crash hotspot" else "Traffic-stop hotspot")))
             .setGroup("siren-hotspot-" + spot.id)
             .setAutoCancel(true)
             .setTimeoutAfter(60_000)
-        AlertNotify.post(this, AlertNotify.Kind.HOTSPOT, HOTSPOT_ID_BASE + Math.floorMod(spot.id.hashCode(), 1000), n)
+        AlertNotify.post(this, if (spot.isCrashes) AlertNotify.Kind.CRASH_HOTSPOT else AlertNotify.Kind.HOTSPOT, HOTSPOT_ID_BASE + Math.floorMod(spot.id.hashCode(), 1000), n)
     }
 
     // --- Known plate readers, speed and red-light cameras (OpenStreetMap) ---
@@ -880,6 +884,8 @@ class ScanService : Service() {
         private const val HOTSPOT_REALERT_MS = 30 * 60_000L
         /** Only places with at least this many stops in the period alert; quieter ones are just on the map. */
         private const val HOTSPOT_ALERT_MIN = 10
+        /** Crash hotspots cover a year or two, so they need more to count as a dangerous spot. */
+        private const val CRASH_ALERT_MIN = 15
         private const val HOTSPOT_ID_BASE = 7000 // clear of BT_OFF_ID and the flight updates (5100-6099)
         private const val BLE_RESTART_MS = 10 * 60_000L
         private const val CLASSIC_INTERVAL_MS = 30_000L

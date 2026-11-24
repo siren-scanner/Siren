@@ -20,7 +20,7 @@ feature or report a problem* in the app.
 | Classic Bluetooth | discovery every 30 s | the same device names |
 | Wi-Fi | scan every 31 s (Android's limit) | Cradlepoint, Sierra Wireless AirLink, Peplink and Inseego vehicle routers |
 | Drones (beta) | Bluetooth / Wi-Fi Remote ID | any drone broadcasting FAA Remote ID: serial, position, height, operator position |
-| Police call data (online) | cities' open data | traffic-stop hotspots from past police calls (New Orleans) and live police calls (Dallas); [add your city](CONTRIBUTING.md#add-your-citys-police-call-data) |
+| Police call data (online) | cities' and states' open data | traffic-stop hotspots from past police calls (New Orleans), live police calls (Dallas) and crash hotspots (Utah); [add your city](CONTRIBUTING.md#add-your-citys-police-call-data) |
 | Police aircraft (beta, online) | adsb.lol ADS-B feed | helicopters and planes registered to police, sheriffs, state patrols and federal law enforcement (FAA registry) |
 | Flights | adsb.lol ADS-B feed | look up and track any flight by number, callsign or tail number, with status notifications; optional US aircraft registry download (FAA) for make, model, year and owner |
 | Radio (optional, beta) | RTL-SDR dongle | transmissions on police / fire bands (Band watch) or on channels you choose |

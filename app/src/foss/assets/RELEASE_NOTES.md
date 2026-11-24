@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.75 · Nov 24, 2026
+- Crash hotspots: Utah's crash reports (UDOT) show as orange discs on the map - places with many crashes, with how many and when - plus optional alerts (Settings > Police call data > Crash hotspot alerts). Police call data also shows its source in each alert.
+
 ## 1.0.74 · Nov 24, 2026
 - Turn the map by hand with two fingers; the orientation button then offers Reset to north.
 

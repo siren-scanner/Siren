@@ -680,6 +680,7 @@ private fun PoliceDataSettings() {
     var on by remember { mutableStateOf(prefs.policeData) }
     var alerts by remember { mutableStateOf(prefs.hotspotAlerts) }
     var live by remember { mutableStateOf(prefs.liveCalls) }
+    var crashAlerts by remember { mutableStateOf(prefs.crashAlerts) }
     androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { PoliceData.ensureLoaded(context) } }
     val feeds by PoliceData.feeds.collectAsStateWithLifecycle()
     val status by PoliceData.status.collectAsStateWithLifecycle()
@@ -699,6 +700,12 @@ private fun PoliceDataSettings() {
         alerts,
     ) { alerts = it; prefs.hotspotAlerts = it }
     SettingRow(
+        "Crash hotspot alerts",
+        "Where a state publishes its crash reports (Utah so far), places with many crashes show in orange. This alerts " +
+            "when you head toward one with at least 15 - handy on unfamiliar roads. Off by default, since busy highways have many.",
+        crashAlerts,
+    ) { crashAlerts = it; prefs.crashAlerts = it }
+    SettingRow(
         "Live police calls",
         "Where a city publishes active calls, shows them on the map, refreshed every 2 minutes. Their addresses are " +
             "placed on the map using OpenStreetMap's address search.",
@@ -710,8 +717,10 @@ private fun PoliceDataSettings() {
         Column(Modifier.padding(vertical = 4.dp)) {
             Text(f.name, style = MaterialTheme.typography.bodyMedium)
             Text(
-                (if (f.live) "Live calls" else "Traffic-stop hotspots") + " · updated ${f.updated} by the city · " +
-                    (status[f.id] ?: "downloads when you're within ${f.radiusKm.toInt()} km"),
+                (if (f.live) "Live calls" else if (f.kind == "crashes") "Crash hotspots" else "Traffic-stop hotspots") +
+                    " · updated ${f.updated} · " +
+                    (status[f.id] ?: if (f.bounds != null) "downloads the area around you while you're in the state"
+                    else "downloads when you're within ${f.radiusKm.toInt()} km"),
                 style = MaterialTheme.typography.bodySmall, color = Color.Gray,
             )
         }

@@ -1,13 +1,19 @@
 {
   "version": 1,
-  "about": "Public police call data Siren downloads automatically near each city. Add a city: copy an entry, open a pull request. 'history' feeds become traffic-stop hotspots; 'live' feeds show active calls on the map. Siren reads the newest copy of this file from GitHub (main branch) once a day.",
+  "about": "Public police and traffic data Siren downloads automatically near each covered area. Add a place: copy an entry, open a pull request. 'history' feeds become hotspots (traffic stops or crashes); 'live' feeds show active calls on the map. Siren reads the newest copy of this file from GitHub (main branch) once a day.",
   "feeds": [
     {
       "id": "new-orleans",
       "name": "New Orleans Police (NOPD)",
-      "lat": 29.98, "lon": -90.03, "radiusKm": 35,
-      "type": "socrata", "domain": "data.nola.gov",
-      "datasets": ["es9j-6y5d", "4xwx-sfte"],
+      "lat": 29.98,
+      "lon": -90.03,
+      "radiusKm": 35,
+      "type": "socrata",
+      "domain": "data.nola.gov",
+      "datasets": [
+        "es9j-6y5d",
+        "4xwx-sfte"
+      ],
       "mode": "history",
       "timeField": "timecreate",
       "pointField": "location",
@@ -21,18 +27,51 @@
     {
       "id": "dallas-live",
       "name": "Dallas Police active calls",
-      "lat": 32.79, "lon": -96.79, "radiusKm": 40,
-      "type": "socrata", "domain": "www.dallasopendata.com",
-      "datasets": ["9fxf-t2tr"],
+      "lat": 32.79,
+      "lon": -96.79,
+      "radiusKm": 40,
+      "type": "socrata",
+      "domain": "www.dallasopendata.com",
+      "datasets": [
+        "9fxf-t2tr"
+      ],
       "mode": "live",
       "typeField": "nature_of_call",
       "statusField": "status",
       "timeField": "time",
-      "addressFields": ["block", "location"],
-      "city": "Dallas", "state": "TX",
+      "addressFields": [
+        "block",
+        "location"
+      ],
+      "city": "Dallas",
+      "state": "TX",
       "updated": "every few minutes",
       "source": "City of Dallas open data - Dallas Police Active Calls",
       "sourceUrl": "https://www.dallasopendata.com/d/9fxf-t2tr"
+    },
+    {
+      "id": "utah-crashes",
+      "name": "Utah crash reports (UDOT)",
+      "type": "arcgis",
+      "url": "https://maps.udot.utah.gov/central/rest/services/TrafficAndSafety/Crash_Locations/MapServer",
+      "layers": [
+        14,
+        13
+      ],
+      "bounds": [
+        36.99,
+        42.01,
+        -114.06,
+        -109.04
+      ],
+      "mode": "history",
+      "kind": "crashes",
+      "timeField": "CRASH_DATETIME",
+      "timezone": "America/Denver",
+      "what": "crashes",
+      "updated": "nightly by UDOT (reports take months to appear)",
+      "source": "Utah Department of Transportation crash data",
+      "sourceUrl": "https://maps.udot.utah.gov/central/rest/services/TrafficAndSafety/Crash_Locations/MapServer"
     }
   ]
 }

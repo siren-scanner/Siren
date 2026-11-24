@@ -12,7 +12,8 @@ Siren deletes all of it.
   OpenStreetMap's Overpass API, for the area around you, rounded to about 10 km.
 - **Police call data** (Settings > Police call data, if on) from cities' open-data portals (for example
   data.nola.gov and dallasopendata.com) when you're near a covered city. Siren asks for the city's
-  whole data set, not your location. Addresses of live calls are looked up with OpenStreetMap's
+  whole data set, not your location. For statewide data (Utah's crash reports from UDOT) it asks
+  for the area around you, rounded to about 20 km. Addresses of live calls are looked up with OpenStreetMap's
   Nominatim search; it's sent the call's address, not yours. The list of cities is read daily from
   this project on GitHub.
 - **Police aircraft** (Settings > Drones & aircraft > Police aircraft, if on) from the free ADS-B feed

@@ -533,7 +533,7 @@ private class AirLayer {
     }
 }
 
-/** Traffic-stop hotspots (red discs, bigger for busier places) and live police calls (blue dots). */
+/** Traffic-stop hotspots (red), crash hotspots (orange) - bigger for busier places - and live police calls (blue). */
 private class PoliceLayer {
     private var shown: Pair<Map<String, List<PoliceData.Hotspot>>, Map<String, List<PoliceData.LiveCall>>>? = null
     private var shownDetail = false
@@ -561,9 +561,11 @@ private class PoliceLayer {
                 overlays += Marker(map).apply {
                     position = GeoPoint(h.lat, h.lon)
                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                    icon = icons.getOrPut(size) { disc(ctx, 0xCCE53935.toInt(), size) }
-                    title = "Traffic-stop hotspot"
-                    snippet = "${h.count} ${h.what} here in the last ${h.days} days" +
+                    // Traffic stops red, crashes orange.
+                    val color = if (h.isCrashes) 0xCCFB8C00.toInt() else 0xCCE53935.toInt()
+                    icon = icons.getOrPut(size * 2 + if (h.isCrashes) 1 else 0) { disc(ctx, color, size) }
+                    title = if (h.isCrashes) "Crash hotspot" else "Traffic-stop hotspot"
+                    snippet = "${h.count} ${h.what} here ${h.period}" +
                         (h.peak?.let { "<br>Most around $it" } ?: "")
                     subDescription = feed?.let { "${it.source} (updated ${it.updated})" }
                 }

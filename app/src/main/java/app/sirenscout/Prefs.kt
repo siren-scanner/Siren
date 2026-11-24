@@ -92,6 +92,10 @@ class Prefs(context: Context) {
     var hotspotAlerts: Boolean
         get() = sp.getBoolean("hotspot_alerts", true)
         set(v) = sp.edit().putBoolean("hotspot_alerts", v).apply()
+    /** Alerts for crash hotspots: off by default, since busy roads have many. */
+    var crashAlerts: Boolean
+        get() = sp.getBoolean("crash_alerts", false)
+        set(v) = sp.edit().putBoolean("crash_alerts", v).apply()
     var liveCalls: Boolean
         get() = sp.getBoolean("live_calls", true)
         set(v) = sp.edit().putBoolean("live_calls", v).apply()

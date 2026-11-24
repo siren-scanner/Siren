@@ -14,7 +14,12 @@ class PoliceDataTest {
 
     @Test
     fun `the bundled feed list parses`() {
-        assertEquals(setOf("new-orleans", "dallas-live"), feeds.map { it.id }.toSet())
+        assertEquals(setOf("new-orleans", "dallas-live", "utah-crashes"), feeds.map { it.id }.toSet())
+        val utah = feeds.first { it.id == "utah-crashes" }
+        assertTrue(utah.type == "arcgis" && utah.kind == "crashes" && utah.layers.isNotEmpty())
+        assertTrue(utah.covers(41.16, -112.03))     // Roy
+        assertTrue(!utah.covers(30.37, -89.09))     // the Mississippi coast
+        assertTrue(nola.covers(29.95, -90.07) && !nola.covers(41.16, -112.03))
         assertTrue(!nola.live && nola.pointField == "location" && nola.datasets.size == 2)
         val dallas = feeds.first { it.id == "dallas-live" }
         assertTrue(dallas.live && dallas.addressFields == listOf("block", "location") && dallas.city == "Dallas")
@@ -55,7 +60,7 @@ class PoliceDataTest {
 
     @Test
     fun `hotspots ahead while driving`() {
-        val spot = PoliceData.Hotspot("t", 30.001, -90.0, 20, null, 90, "traffic stops")   // ~110 m north
+        val spot = PoliceData.Hotspot("t", 30.001, -90.0, 20, null, "in the last 90 days", "traffic stops")   // ~110 m north
         val quiet = spot.copy(lat = 30.0015, count = 6)
         val behind = spot.copy(lat = 29.999)
         val ahead = PoliceData.hotspotsAhead(listOf(spot, quiet, behind), 30.0, -90.0, heading = 0f, radiusM = 300.0, minCount = 10)
@@ -72,5 +77,10 @@ class PoliceDataTest {
         val rows = PoliceData.downloadLiveRows(feeds.first { it.id == "dallas-live" })
         println("Dallas: ${rows.length()} active calls, e.g. ${(0 until minOf(3, rows.length())).map { rows.getJSONObject(it).optString("nature_of_call") }}")
         assertTrue(rows.length() > 0)
+        val utah = feeds.first { it.id == "utah-crashes" }
+        val (crashes, period) = PoliceData.downloadArcgis(utah, PoliceData.tile(41.16), PoliceData.tile(-112.03))
+        val crashSpots = PoliceData.aggregate(utah, crashes, period)
+        println("Roy, UT: ${crashes.size} crashes $period -> ${crashSpots.size} crash hotspots; busiest ${crashSpots.take(3).map { "${it.count} (${it.peak})" }}")
+        assertTrue(crashes.size > 500)
     }
 }

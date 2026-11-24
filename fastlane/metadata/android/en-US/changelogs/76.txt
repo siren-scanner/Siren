@@ -1,1 +1,0 @@
-Police call data (traffic-stop hotspots and live calls) and two-finger map rotation.

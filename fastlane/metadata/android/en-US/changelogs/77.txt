@@ -1,0 +1,1 @@
+Police and traffic data: traffic-stop hotspots (New Orleans), live police calls (Dallas) and crash hotspots (Utah), downloaded automatically nearby; two-finger map rotation.

@@ -1,1 +1,0 @@
-Police call data from cities' open data: traffic-stop hotspots (New Orleans) and live police calls (Dallas), downloaded automatically nearby.

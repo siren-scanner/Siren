@@ -91,7 +91,11 @@ fun DetectionMap(
     onFullScreen: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    var headingUp by remember { mutableStateOf(Prefs(context).mapHeadingUp) }
+    /** How the map turns: with your heading, never (north up), or wherever you turned it by hand. */
+    var turn by remember { mutableStateOf(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH) }
+    // The location overlay reads this off the main thread, so it can't read Compose state.
+    val turnNow = remember { java.util.concurrent.atomic.AtomicReference(turn) }
+    fun setTurn(t: MapTurn) { turn = t; turnNow.set(t) }
     val markers = remember { mutableMapOf<String, Marker>() }
     /** The pin whose card is showing, by detection uid. */
     val selectedState = remember { mutableStateOf<String?>(null) }
@@ -134,7 +138,14 @@ fun DetectionMap(
             tilesScaleFactor = MapText.scale.value
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(15.0)
-            val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this) { Prefs(context).mapHeadingUp }
+            val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this) { turnNow.get() == MapTurn.HEADING }
+            // Two fingers turn the map by hand; it then stays where you put it until you reset it.
+            overlays.add(object : org.osmdroid.views.overlay.gestures.RotationGestureOverlay(this) {
+                override fun onRotate(deltaAngle: Float) {
+                    super.onRotate(deltaAngle)
+                    if (turnNow.get() != MapTurn.FREE) setTurn(MapTurn.FREE)
+                }
+            }.apply { isEnabled = true })
             if (!DemoMode.active) {
                 me.enableMyLocation()
                 me.enableFollowLocation()
@@ -338,13 +349,22 @@ fun DetectionMap(
             val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             FilledTonalButton(
                 onClick = {
-                    headingUp = !headingUp
-                    Prefs(context).mapHeadingUp = headingUp
-                    if (!headingUp) mapView.mapOrientation = 0f
+                    // Heading up <-> North up; from a hand-turned map, back to north first.
+                    val next = if (turn == MapTurn.NORTH) MapTurn.HEADING else MapTurn.NORTH
+                    setTurn(next)
+                    Prefs(context).mapHeadingUp = next == MapTurn.HEADING
+                    if (next == MapTurn.NORTH) mapView.mapOrientation = 0f
                     else me.lastFreshBearing()?.let { if (me.isFollowLocationEnabled) mapView.mapOrientation = -it }
+                    MapState.remember(mapView, me.isFollowLocationEnabled)
                 },
                 contentPadding = small,
-            ) { Text(if (headingUp) "\u2191 Heading up" else "N\u2191 North up") }
+            ) {
+                Text(when (turn) {
+                    MapTurn.HEADING -> "\u2191 Heading up"
+                    MapTurn.NORTH -> "N\u2191 North up"
+                    MapTurn.FREE -> "N\u2191 Reset to north"
+                })
+            }
             onFullScreen?.let { open ->
                 FilledTonalButton(onClick = open, contentPadding = small) { Text(if (fullScreen) "Exit full screen" else "Full screen") }
             }
@@ -355,6 +375,7 @@ fun DetectionMap(
                     me.disableFollowLocation()
                     following = false
                     mapView.mapOrientation = 0f
+                    if (turn == MapTurn.FREE) setTurn(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH)
                     val points = located.map { d -> Detections.estimate(d)?.let { GeoPoint(it.lat, it.lon) } ?: GeoPoint(d.lat!!, d.lon!!) }
                     if (points.size == 1) mapView.controller.animateTo(points[0], 17.0, 600L)
                     else mapView.zoomToBoundingBox(BoundingBox.fromGeoPoints(points).increaseByScale(1.3f), true)
@@ -398,7 +419,10 @@ fun DetectionMap(
                 onClick = {
                     me.enableFollowLocation()
                     following = true
-                    if (!headingUp) mapView.mapOrientation = 0f
+                    // Following again: back to your chosen mode rather than the hand-turned angle.
+                    val mode = if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH
+                    setTurn(mode)
+                    if (mode == MapTurn.NORTH) mapView.mapOrientation = 0f
                     if (mapView.zoomLevelDouble < 15.0) mapView.controller.setZoom(16.0)
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
@@ -701,6 +725,8 @@ object MapText {
         scale.value = v
     }
 }
+
+enum class MapTurn { HEADING, NORTH, FREE }
 
 /** Where the map was last looking, shared by the normal and full-screen maps (for this app run). */
 object MapState {

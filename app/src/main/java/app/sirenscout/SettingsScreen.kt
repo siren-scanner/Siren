@@ -42,6 +42,7 @@ import kotlin.math.roundToInt
 private enum class SettingsPage(val title: String, val summary: String) {
     ALERTS("Alerts", "Sounds, signal strength, police following you, unknown trackers"),
     CAMERAS("Cameras", "Plate readers, speed and red-light cameras on the map and alert distance"),
+    POLICE("Police call data", "Traffic-stop hotspots and live police calls from cities' open data"),
     AIR("Drones & aircraft", "Drones' Remote ID, police helicopters and planes"),
     SCANNING("Scanning", "Auto-optimize, Wi-Fi, screen off, turning things on"),
     MAP("Map", "Your location marker, map text size"),
@@ -93,6 +94,7 @@ fun SettingsScreen(onClose: () -> Unit) {
                         }
                         SettingsPage.ALERTS -> AlertSettings()
                         SettingsPage.CAMERAS -> CameraSettings()
+                        SettingsPage.POLICE -> PoliceDataSettings()
                         SettingsPage.AIR -> AirSettings()
                         SettingsPage.SCANNING -> {
                             val prefs = Prefs(LocalContext.current)
@@ -668,4 +670,55 @@ private fun MapTextSetting() {
             )
         }
     }
+}
+
+/** Police call data that cities publish, downloaded automatically near each covered city. */
+@Composable
+private fun PoliceDataSettings() {
+    val context = LocalContext.current
+    val prefs = Prefs(context)
+    var on by remember { mutableStateOf(prefs.policeData) }
+    var alerts by remember { mutableStateOf(prefs.hotspotAlerts) }
+    var live by remember { mutableStateOf(prefs.liveCalls) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { PoliceData.ensureLoaded(context) } }
+    val feeds by PoliceData.feeds.collectAsStateWithLifecycle()
+    val status by PoliceData.status.collectAsStateWithLifecycle()
+    SettingRow(
+        "Police call data (online)",
+        "Some cities publish their police calls as open data. Near one, Siren downloads it automatically: past " +
+            "traffic stops become hotspots on the map (red), and live calls show where police are now (blue). " +
+            "It downloads each city's whole data set, so the city isn't told where you are. More cities are " +
+            "added to the list on GitHub over time - no app update needed.",
+        on,
+    ) { on = it; prefs.policeData = it }
+    if (!on) return
+    SettingRow(
+        "Hotspot alerts",
+        "While driving, alerts (with the camera chime) when you head toward a place with frequent traffic stops - " +
+            "at least 10 in the last 3 months - at most every 30 minutes per place.",
+        alerts,
+    ) { alerts = it; prefs.hotspotAlerts = it }
+    SettingRow(
+        "Live police calls",
+        "Where a city publishes active calls, shows them on the map, refreshed every 2 minutes. Their addresses are " +
+            "placed on the map using OpenStreetMap's address search.",
+        live,
+    ) { live = it; prefs.liveCalls = it }
+    HorizontalDivider()
+    Text("Cities", style = MaterialTheme.typography.titleSmall)
+    feeds.forEach { f ->
+        Column(Modifier.padding(vertical = 4.dp)) {
+            Text(f.name, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                (if (f.live) "Live calls" else "Traffic-stop hotspots") + " · updated ${f.updated} by the city · " +
+                    (status[f.id] ?: "downloads when you're within ${f.radiusKm.toInt()} km"),
+                style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+            )
+        }
+    }
+    Text(
+        "Hotspots show where stops happened, not where police are right now. Data comes from each city as published; " +
+            "some calls are left out or delayed by the city.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
 }

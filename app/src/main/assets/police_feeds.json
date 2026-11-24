@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "about": "Public police call data Siren downloads automatically near each city. Add a city: copy an entry, open a pull request. 'history' feeds become traffic-stop hotspots; 'live' feeds show active calls on the map. Siren reads the newest copy of this file from GitHub (main branch) once a day.",
+  "feeds": [
+    {
+      "id": "new-orleans",
+      "name": "New Orleans Police (NOPD)",
+      "lat": 29.98, "lon": -90.03, "radiusKm": 35,
+      "type": "socrata", "domain": "data.nola.gov",
+      "datasets": ["es9j-6y5d", "4xwx-sfte"],
+      "mode": "history",
+      "timeField": "timecreate",
+      "pointField": "location",
+      "where": "((typetext = 'TRAFFIC INCIDENT' AND selfinitiated = 'Y') OR typetext = 'DIRECTED TRAFFIC ENFORCEMENT')",
+      "days": 90,
+      "what": "traffic stops",
+      "updated": "daily",
+      "source": "City of New Orleans open data - NOPD calls for service",
+      "sourceUrl": "https://data.nola.gov/d/es9j-6y5d"
+    },
+    {
+      "id": "dallas-live",
+      "name": "Dallas Police active calls",
+      "lat": 32.79, "lon": -96.79, "radiusKm": 40,
+      "type": "socrata", "domain": "www.dallasopendata.com",
+      "datasets": ["9fxf-t2tr"],
+      "mode": "live",
+      "typeField": "nature_of_call",
+      "statusField": "status",
+      "timeField": "time",
+      "addressFields": ["block", "location"],
+      "city": "Dallas", "state": "TX",
+      "updated": "every few minutes",
+      "source": "City of Dallas open data - Dallas Police Active Calls",
+      "sourceUrl": "https://www.dallasopendata.com/d/9fxf-t2tr"
+    }
+  ]
+}

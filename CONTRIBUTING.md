@@ -16,6 +16,21 @@ Open an issue: **Issues > New issue**, then pick a form:
 You can do this from the app too: Settings > Help & diagnostics > Suggest a feature or report a
 problem.
 
+## Add your city's police call data
+
+If your city or county publishes police calls as open data, Siren can use it. Add an entry to
+[`app/src/main/assets/police_feeds.json`](app/src/main/assets/police_feeds.json) and open a pull
+request (or open an issue with the link to the data). Siren reads the newest copy of that file from
+GitHub every day, so a new city works for everyone without an app update.
+
+- `"mode": "history"` - a data set of past calls with a map position (`pointField`) and time
+  (`timeField`); `where` picks the traffic stops. Siren turns the last `days` into hotspots.
+- `"mode": "live"` - a data set of active calls; give the call type (`typeField`), status and the
+  address fields, plus `city` and `state` so the address can be found on the map.
+- `lat`, `lon` and `radiusKm`: where the data applies; Siren only downloads it near there.
+
+Only Socrata open-data portals (`"type": "socrata"`) are supported so far.
+
 ## Code
 
 - Build and test the open-source edition: `./gradlew assembleFossDebug testFossDebugUnitTest`.

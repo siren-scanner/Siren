@@ -10,6 +10,11 @@ Siren deletes all of it.
 - **Map tiles** from OpenStreetMap's tile servers, for the area you're looking at.
 - **Camera locations** - plate readers, speed and red-light cameras (Settings > Cameras, if on - it's off until you turn it on) from
   OpenStreetMap's Overpass API, for the area around you, rounded to about 10 km.
+- **Police call data** (Settings > Police call data, if on) from cities' open-data portals (for example
+  data.nola.gov and dallasopendata.com) when you're near a covered city. Siren asks for the city's
+  whole data set, not your location. Addresses of live calls are looked up with OpenStreetMap's
+  Nominatim search; it's sent the call's address, not yours. The list of cities is read daily from
+  this project on GitHub.
 - **Police aircraft** (Settings > Drones & aircraft > Police aircraft, if on) from the free ADS-B feed
   at adsb.lol, every 30 seconds while scanning, for your area rounded to about 10 km.
 - **Flights you look up or track:** the flight number, callsign or tail number goes to adsb.lol. Your

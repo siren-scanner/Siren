@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.73 · Nov 24, 2026
+- Police call data (Settings > Police call data): near cities that publish their police calls, Siren downloads them automatically. New Orleans: traffic-stop hotspots from the last 3 months (red discs, tap for how many and the usual time), with an alert when you drive toward a busy one. Dallas: live police calls on the map (blue dots). More cities can be added to the list on GitHub without an app update.
+
 ## 1.0.72 · Nov 24, 2026
 - Readable map text: street names are now drawn at the right size for the screen (they were tiny on sharp phone screens), and Settings > Map > Map text size makes them larger still - up to Largest.
 - Map orientation button: switch between Heading up (the map turns with your direction of travel) and North up. Siren remembers your choice.

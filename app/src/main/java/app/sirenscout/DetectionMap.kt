@@ -98,7 +98,7 @@ fun DetectionMap(
     var selected by selectedState
     /** Translucent uncertainty circles for estimated locations, by detection uid. */
     val circles = remember { mutableMapOf<String, Polygon>() }
-    var following by remember { mutableStateOf(true) }
+    var following by remember { mutableStateOf(MapState.following) }
     var center by remember { mutableStateOf<GeoPoint?>(null) }
     var zoom by remember { mutableStateOf(15) }
     val showCameras = remember { Prefs(context).knownCameras }
@@ -106,6 +106,10 @@ fun DetectionMap(
     val speedCameras = remember { Prefs(context).speedCameras }
     val wantedCameras = remember(cameras) { cameras.wanted(speedCameras) }
     val cameraLayer = remember { CameraLayer() }
+    val showPolice = remember { Prefs(context).policeData }
+    val hotspots by PoliceData.hotspots.collectAsStateWithLifecycle()
+    val liveCalls by PoliceData.live.collectAsStateWithLifecycle()
+    val policeLayer = remember { PoliceLayer() }
     val airLayer = remember { AirLayer() }
     airLayer.onDetails = onAirDetails
     var hasLocation by remember {
@@ -135,6 +139,15 @@ fun DetectionMap(
                 me.enableMyLocation()
                 me.enableFollowLocation()
             }
+            // Pick up where the other map left off (full screen and back show the same place).
+            MapState.center?.let { c ->
+                controller.setZoom(MapState.zoom)
+                controller.setCenter(c)
+                if (!MapState.following) {
+                    me.disableFollowLocation()
+                    mapOrientation = MapState.orientation
+                }
+            }
             overlays.add(me)
             overlays.add(CopyrightOverlay(context)) // "© OpenStreetMap contributors", required by OSM
             // Any tap closes open popups. Returning false lets a tapped pin still open its own.
@@ -152,11 +165,13 @@ fun DetectionMap(
                 override fun onScroll(event: ScrollEvent?): Boolean {
                     following = me.isFollowLocationEnabled
                     center = mapCenter as GeoPoint
+                    MapState.remember(this@run, me.isFollowLocationEnabled)
                     return false
                 }
 
                 override fun onZoom(event: ZoomEvent?): Boolean {
                     zoom = zoomLevelDouble.roundToInt()
+                    MapState.remember(this@run, me.isFollowLocationEnabled)
                     return false
                 }
             })
@@ -175,6 +190,20 @@ fun DetectionMap(
                 // 0,0 is the map's default before any fix - open ocean, nothing to download.
                 if (abs(c.latitude) < 1 && abs(c.longitude) < 1) continue
                 withContext(Dispatchers.IO) { KnownCameras.refreshAround(context, c.latitude, c.longitude) }
+            }
+        }
+    }
+
+    if (showPolice) {
+        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { PoliceData.ensureLoaded(context) } }
+        // Like the cameras: download a city's police data when the map is looking at it.
+        LaunchedEffect(Unit) {
+            val live = Prefs(context).liveCalls
+            while (true) {
+                delay(10_000)
+                val c = center ?: mapView.mapCenter.let { GeoPoint(it.latitude, it.longitude) }
+                if (abs(c.latitude) < 1 && abs(c.longitude) < 1) continue
+                withContext(Dispatchers.IO) { PoliceData.refreshAround(context, c.latitude, c.longitude, live) }
             }
         }
     }
@@ -258,6 +287,7 @@ fun DetectionMap(
     Box(modifier.clipToBounds()) {
         AndroidView(factory = { mapView }, update = { map ->
             if (showCameras) cameraLayer.update(map, wantedCameras, zoom)
+            if (showPolice) policeLayer.update(map, hotspots, liveCalls, zoom)
             airLayer.update(map, air)
             // Update markers in place so an open info window survives new scan results.
             val keys = located.mapTo(HashSet()) { it.uid }
@@ -479,6 +509,75 @@ private class AirLayer {
     }
 }
 
+/** Traffic-stop hotspots (red discs, bigger for busier places) and live police calls (blue dots). */
+private class PoliceLayer {
+    private var shown: Pair<Map<String, List<PoliceData.Hotspot>>, Map<String, List<PoliceData.LiveCall>>>? = null
+    private var shownDetail = false
+    private val overlays = mutableListOf<Overlay>()
+
+    fun update(map: MapView, hotspots: Map<String, List<PoliceData.Hotspot>>, live: Map<String, List<PoliceData.LiveCall>>, zoom: Int) {
+        // Hundreds of hotspots would bury a zoomed-out map: only the busiest show below zoom 13.
+        val detail = zoom >= 13
+        if (shown?.first === hotspots && shown?.second === live && detail == shownDetail) return
+        shown = hotspots to live
+        shownDetail = detail
+        overlays.forEach { (it as? Marker)?.closeInfoWindow() }
+        map.overlays.removeAll(overlays.toSet())
+        overlays.clear()
+        val feeds = PoliceData.feeds.value.associateBy { it.id }
+        val ctx = map.context
+        val icons = HashMap<Int, android.graphics.drawable.Drawable>()
+        for ((feedId, spots) in hotspots) {
+            val feed = feeds[feedId]
+            val top = spots.maxOfOrNull { it.count } ?: continue
+            for (h in spots) {
+                if (!detail && h.count < top / 4) continue
+                // Three sizes, by how busy the place is compared with the city's busiest.
+                val size = when { h.count >= top / 2 -> 26; h.count >= top / 5 -> 20; else -> 14 }
+                overlays += Marker(map).apply {
+                    position = GeoPoint(h.lat, h.lon)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    icon = icons.getOrPut(size) { disc(ctx, 0xCCE53935.toInt(), size) }
+                    title = "Traffic-stop hotspot"
+                    snippet = "${h.count} ${h.what} here in the last ${h.days} days" +
+                        (h.peak?.let { "<br>Most around $it" } ?: "")
+                    subDescription = feed?.let { "${it.source} (updated ${it.updated})" }
+                }
+            }
+        }
+        val liveIcon = disc(ctx, 0xFF1E88E5.toInt(), 16)
+        for ((feedId, calls) in live) {
+            val feed = feeds[feedId]
+            for (c in calls) {
+                overlays += Marker(map).apply {
+                    position = GeoPoint(c.lat, c.lon)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    icon = liveIcon
+                    title = "Police call: ${c.type}"
+                    snippet = listOfNotNull(c.status, c.time?.let { "since $it" }, c.address).joinToString("<br>")
+                    subDescription = feed?.let { "${it.source} (live)" }
+                }
+            }
+        }
+        // Under the cameras, pins and location dot.
+        map.overlays.addAll(0, overlays)
+        map.invalidate()
+    }
+
+    /** A filled disc with a white rim, [sizeDp] across. */
+    private fun disc(ctx: android.content.Context, color: Int, sizeDp: Int): android.graphics.drawable.Drawable {
+        val px = (sizeDp * ctx.resources.displayMetrics.density).roundToInt()
+        val bmp = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bmp)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        paint.color = 0xFFFFFFFF.toInt()
+        canvas.drawCircle(px / 2f, px / 2f, px / 2f, paint)
+        paint.color = color
+        canvas.drawCircle(px / 2f, px / 2f, px / 2f - px / 8f, paint)
+        return android.graphics.drawable.BitmapDrawable(ctx.resources, bmp)
+    }
+}
+
 /** Draws known cameras: a translucent cone for each direction they face, and a pin. */
 private class CameraLayer {
     private var shown: List<Camera>? = null
@@ -600,6 +699,23 @@ object MapText {
     fun set(context: android.content.Context, v: Float) {
         Prefs(context).mapTextScale = v
         scale.value = v
+    }
+}
+
+/** Where the map was last looking, shared by the normal and full-screen maps (for this app run). */
+object MapState {
+    var center: GeoPoint? = null
+    var zoom = 15.0
+    var following = true
+    var orientation = 0f
+
+    fun remember(map: MapView, following: Boolean) {
+        val c = map.mapCenter
+        if (abs(c.latitude) < 1 && abs(c.longitude) < 1) return // the default before any fix
+        center = GeoPoint(c.latitude, c.longitude)
+        zoom = map.zoomLevelDouble
+        this.following = following
+        orientation = map.mapOrientation
     }
 }
 

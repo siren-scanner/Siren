@@ -17,6 +17,7 @@ object AlertNotify {
         SURVEILLANCE("Flock, Raven and other surveillance sensors nearby"),
         PLATE_READER("Mapped plate reader ahead"),
         SPEED_CAMERA("Speed or red-light camera ahead"),
+        HOTSPOT("Traffic-stop hotspot ahead"),
         AIR("Drones and police aircraft"),
         FLIGHTS("Tracked flight updates"),
         OTHER("Fleet gear and fire / EMS"),

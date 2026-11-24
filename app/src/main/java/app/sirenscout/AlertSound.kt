@@ -22,7 +22,7 @@ object AlertSound {
         RADIO("Public-safety radio transmitting nearby"),
         TRACKER("Unknown tracker traveling with you"),
         CAMERA("Plate reader ahead"),
-        SPEED_CAMERA("Speed or red-light camera ahead"),
+        SPEED_CAMERA("Speed camera, red-light camera or traffic-stop hotspot ahead"),
         AIR("Drone or police aircraft nearby"),
         OTHER("Other matches (fleet, fire / EMS, surveillance)"),
     }

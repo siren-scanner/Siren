@@ -620,6 +620,48 @@ class ScanService : Service() {
         // Prefer a fresh GPS fix, but don't let a coarse network fix replace a recent precise one.
         if (prev == null || loc.time - prev.time > 10_000 || loc.accuracy <= prev.accuracy) lastLocation = loc
         checkKnownCameras(loc)
+        checkPoliceData(loc)
+    }
+
+    // --- Police call data from cities' open data ---
+
+    private val hotspotAlertedAt = HashMap<String, Long>()
+    private var lastPoliceRefresh = 0L
+
+    private fun checkPoliceData(loc: Location) {
+        if (!prefs.policeData || loc.accuracy > 100f) return
+        val now = System.currentTimeMillis()
+        if (now - lastPoliceRefresh > 60_000) {
+            lastPoliceRefresh = now
+            val live = prefs.liveCalls
+            scope.launch(Dispatchers.IO) { PoliceData.refreshAround(this@ScanService, loc.latitude, loc.longitude, live) }
+        }
+        if (!prefs.hotspotAlerts) return
+        // Only while driving: "ahead" needs a direction, and walkers don't get pulled over.
+        val heading = loc.takeIf { it.hasBearing() && it.speed >= 5f }?.bearing ?: return
+        val all = PoliceData.hotspots.value.values.flatten()
+        if (all.isEmpty()) return
+        val ahead = PoliceData.hotspotsAhead(
+            all, loc.latitude, loc.longitude, heading, AutoTune.cameraAlertM(prefs, loc.speed).toDouble().coerceAtLeast(200.0), HOTSPOT_ALERT_MIN,
+        )
+        val (spot, distance) = ahead.firstOrNull { now - (hotspotAlertedAt[it.first.id] ?: 0L) > HOTSPOT_REALERT_MS } ?: return
+        hotspotAlertedAt[spot.id] = now
+        val title = "Traffic-stop hotspot ahead · ${formatShortDistance(distance)}"
+        val text = "${spot.count} ${spot.what} here in the last ${spot.days} days" + (spot.peak?.let { ", most around $it" } ?: "")
+        CarDisplay.publishAlert(title, text)
+        AlertSound.play(this, AlertSound.Kind.SPEED_CAMERA)
+        val n = NotificationCompat.Builder(this, CH_ALERTS)
+            .setSmallIcon(R.drawable.ic_stat_siren)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$text. From the city's published police call data."))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setContentIntent(DeepLink.intent(this, DeepLink.Place(spot.lat, spot.lon, "Traffic-stop hotspot")))
+            .setGroup("siren-hotspot-" + spot.id)
+            .setAutoCancel(true)
+            .setTimeoutAfter(60_000)
+        AlertNotify.post(this, AlertNotify.Kind.HOTSPOT, HOTSPOT_ID_BASE + Math.floorMod(spot.id.hashCode(), 1000), n)
     }
 
     // --- Known plate readers, speed and red-light cameras (OpenStreetMap) ---
@@ -835,6 +877,10 @@ class ScanService : Service() {
         private const val AIRCRAFT_POLL_MS = 30_000L
         private val REMOTE_ID_UUID: ParcelUuid = ParcelUuid.fromString(RemoteId.BLE_SERVICE_UUID)
         private const val CAMERA_REALERT_MS = 15 * 60_000L
+        private const val HOTSPOT_REALERT_MS = 30 * 60_000L
+        /** Only places with at least this many stops in the period alert; quieter ones are just on the map. */
+        private const val HOTSPOT_ALERT_MIN = 10
+        private const val HOTSPOT_ID_BASE = 7000 // clear of BT_OFF_ID and the flight updates (5100-6099)
         private const val BLE_RESTART_MS = 10 * 60_000L
         private const val CLASSIC_INTERVAL_MS = 30_000L
         private const val WIFI_INTERVAL_MS = 31_000L

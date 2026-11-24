@@ -255,6 +255,14 @@ private fun ManualContent() {
     Bullet("The map is only as complete as volunteers have made it. Unmapped cameras won't show, and directions can be off; mobile speed cameras and speed vans can't be mapped at all. You can add missing plate readers at deflock.me, and speed cameras in OpenStreetMap.")
     Bullet("Turn the layer off or change the alert distance in Settings > Cameras.")
 
+    Section("Police call data")
+    Para("Some cities publish their police calls as open data. Near one of them, Siren downloads it by itself (Settings > Police call data${if (BuildConfig.REPO_URL.isNotEmpty()) ", off until you turn it on" else ""}).")
+    Bullet("Traffic-stop hotspots (red discs on the map): places where officers pulled drivers over often in the last 3 months, from the city's records. Bigger discs mean more stops; tap one for how many and the usual time of day. They show where stops happen, not where police are right now.")
+    Bullet("While driving toward a hotspot with at least 10 stops, you get an alert with the camera chime, at most every 30 minutes per place.")
+    Bullet("Live police calls (blue dots): where a city publishes its active calls, they show on the map with the call type and status, refreshed every 2 minutes.")
+    Bullet("Covered so far: New Orleans (hotspots, updated daily by the city) and Dallas (live calls). The list of cities lives on the project's GitHub page and Siren checks it daily, so new cities appear without an app update. Most places don't publish this data, including the Mississippi coast.")
+    Bullet("Siren downloads each city's whole data set, so the city isn't told where you are. Live call addresses are placed on the map with OpenStreetMap's address search, which is sent the call's address - never yours.")
+
     Section("Drones and police aircraft")
     Para(
         "Both show in the Air tab and on the map as purple arrows " +

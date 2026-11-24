@@ -82,6 +82,20 @@ class Prefs(context: Context) {
         get() = sp.getFloat("map_text_scale", 1f)
         set(v) = sp.edit().putFloat("map_text_scale", v).apply()
 
+    /**
+     * Police call data from cities' open data (traffic-stop hotspots, live calls). Downloads from
+     * the internet, so opt-in in the public edition, on in the maintainer's builds.
+     */
+    var policeData: Boolean
+        get() = sp.getBoolean("police_data", BuildConfig.REPO_URL.isEmpty())
+        set(v) = sp.edit().putBoolean("police_data", v).apply()
+    var hotspotAlerts: Boolean
+        get() = sp.getBoolean("hotspot_alerts", true)
+        set(v) = sp.edit().putBoolean("hotspot_alerts", v).apply()
+    var liveCalls: Boolean
+        get() = sp.getBoolean("live_calls", true)
+        set(v) = sp.edit().putBoolean("live_calls", v).apply()
+
     var cameraAlertM: Float
         get() = sp.getFloat("camera_alert_m", 250f)
         set(v) = sp.edit().putFloat("camera_alert_m", v).apply()

@@ -2,6 +2,12 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.72 · Nov 24, 2026
+- Readable map text: street names are now drawn at the right size for the screen (they were tiny on sharp phone screens), and Settings > Map > Map text size makes them larger still - up to Largest.
+- Map orientation button: switch between Heading up (the map turns with your direction of travel) and North up. Siren remembers your choice.
+- Full screen map: the Full screen button shows the map on its own; Exit full screen or Back returns.
+- Fixed the map sometimes staying turned after rotating the phone.
+
 ## 1.0.70 · Nov 23, 2026
 - Fewer false vehicle-router alerts: Cradlepoint routers named after shop and office models (E300, E3000, AER2200, CBA850…) aren't matched any more, and Cradlepoint, Sierra, Peplink and Inseego routers only alert when their name is a vehicle model's (like IBR900) or police or fire / EMS gear is also nearby. A router seen in the same place on an earlier day is treated as fixed and stays quiet. Settings > Alerts > Vehicle routers on their own brings back the old behavior.
 

@@ -1,0 +1,1 @@
+Readable map text with a Map text size setting, a Heading up / North up button, a full screen map, and a fix for the map staying turned after rotating the phone.

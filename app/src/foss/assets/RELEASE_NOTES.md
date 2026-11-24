@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.76 · Nov 24, 2026
+- Search a place: find any town or address from the map; Siren loads what it has for that area (cameras, police and crash data) and sums it up in a card.
+
 ## 1.0.75 · Nov 24, 2026
 - Crash hotspots: Utah's crash reports (UDOT) show as orange discs on the map - places with many crashes, with how many and when - plus optional alerts (Settings > Police call data > Crash hotspot alerts). Police call data also shows its source in each alert.
 

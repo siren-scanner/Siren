@@ -237,6 +237,7 @@ private fun ManualContent() {
     Bullet("Show all zooms to fit every pin and turns the map back to north-up.")
     Bullet("The button at the top left switches between Heading up (while following you, the map turns so the way you're going points up) and North up (the map never turns). Siren remembers your choice.")
     Bullet("Turn the map yourself with two fingers. It stays where you put it; the button then says Reset to north. Follow me or Show all also put it back to your chosen mode.")
+    Bullet("Search a place (on the map) finds a town or address anywhere and moves the map there. Siren then downloads what it has for that area - mapped cameras, police and crash data where published - and a card sums up what's within 15 miles. Uses OpenStreetMap's search, which is sent what you type, not your location. Follow me brings the map back to you.")
     Bullet("Full screen shows the map on its own, over everything else; Exit full screen or Back returns.")
     Bullet("Street names hard to read? Settings > Map > Map text size draws the map bigger: Large, Extra large or Largest. Zooming in alone doesn't help, because the names are part of the map pictures and each zoom level draws them the same size.")
     Bullet("Map tiles come from OpenStreetMap and need a data connection the first time you view an area. Viewed areas are cached.")

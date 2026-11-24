@@ -447,6 +447,17 @@ object Geocoder {
     @Synchronized
     fun cached(context: Context, address: String, city: String?, state: String?) = load(context)[key(address, city, state)]
 
+    data class Place(val name: String, val lat: Double, val lon: Double)
+
+    /** Places matching what the user typed ("Little Rock, Arkansas"), best first. Throws on network trouble. */
+    fun search(query: String): List<Place> {
+        val q = URLEncoder.encode(query.trim(), "UTF-8")
+        val a = JSONArray(PoliceData.get("https://nominatim.openstreetmap.org/search?q=$q&format=json&limit=6&addressdetails=0"))
+        return List(a.length()) { a.getJSONObject(it) }.map { o ->
+            Place(o.optString("display_name"), o.getString("lat").toDouble(), o.getString("lon").toDouble())
+        }
+    }
+
     @Synchronized
     fun lookup(context: Context, address: String, city: String?, state: String?): Pair<Double, Double>? {
         val wait = 1_100 - (System.currentTimeMillis() - lastLookup)

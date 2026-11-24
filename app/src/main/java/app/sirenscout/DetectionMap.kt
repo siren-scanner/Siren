@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.foundation.clickable
+import kotlinx.coroutines.launch
 import androidx.compose.material3.MaterialTheme
 import android.location.Location
 import android.text.format.DateUtils
@@ -93,6 +95,9 @@ fun DetectionMap(
     val context = LocalContext.current
     /** How the map turns: with your heading, never (north up), or wherever you turned it by hand. */
     var turn by remember { mutableStateOf(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH) }
+    /** "Search a place": the dialog, and the place the map was sent to (with its summary card). */
+    var searching by remember { mutableStateOf(false) }
+    var searched by remember { mutableStateOf(MapState.searched) }
     // The location overlay reads this off the main thread, so it can't read Compose state.
     val turnNow = remember { java.util.concurrent.atomic.AtomicReference(turn) }
     fun setTurn(t: MapTurn) { turn = t; turnNow.set(t) }
@@ -365,6 +370,7 @@ fun DetectionMap(
                     MapTurn.FREE -> "N\u2191 Reset to north"
                 })
             }
+            FilledTonalButton(onClick = { searching = true }, contentPadding = small) { Text("Search a place") }
             onFullScreen?.let { open ->
                 FilledTonalButton(onClick = open, contentPadding = small) { Text(if (fullScreen) "Exit full screen" else "Full screen") }
             }
@@ -414,6 +420,29 @@ fun DetectionMap(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
             )
         }
+        searched?.let { place ->
+            if (chosen == null) PlaceCard(
+                place, cameras, hotspots, liveCalls,
+                onClose = { searched = null; MapState.searched = null },
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).fillMaxWidth(0.72f),
+            )
+        }
+        if (searching) PlaceSearchDialog(
+            onDismiss = { searching = false },
+            onPick = { place ->
+                searching = false
+                me.disableFollowLocation()
+                following = false
+                mapView.mapOrientation = 0f
+                if (turn == MapTurn.FREE) setTurn(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH)
+                mapView.controller.setZoom(12.0)
+                mapView.controller.setCenter(GeoPoint(place.lat, place.lon))
+                center = GeoPoint(place.lat, place.lon)
+                MapState.remember(mapView, false)
+                searched = place
+                MapState.searched = place
+            },
+        )
         if (!following && hasLocation && chosen == null) {
             FilledTonalButton(
                 onClick = {
@@ -427,6 +456,105 @@ fun DetectionMap(
                 },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
             ) { Text("Follow me") }
+        }
+    }
+}
+
+/** Type a place, pick from what OpenStreetMap finds. */
+@Composable
+private fun PlaceSearchDialog(onDismiss: () -> Unit, onPick: (Geocoder.Place) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    var results by remember { mutableStateOf<List<Geocoder.Place>>(emptyList()) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun go() {
+        if (query.isBlank() || busy) return
+        busy = true; message = null
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { Geocoder.search(query) } }
+            busy = false
+            r.onSuccess { results = it; if (it.isEmpty()) message = "Nothing found - try adding the state" }
+                .onFailure { message = "Search failed - check the internet connection" }
+        }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Search a place") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.OutlinedTextField(
+                    value = query, onValueChange = { query = it }, singleLine = true,
+                    placeholder = { Text("e.g. Little Rock, Arkansas") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { go() }),
+                )
+                if (busy) Text("Searching…", style = MaterialTheme.typography.bodySmall)
+                message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                results.forEach { p ->
+                    Text(
+                        p.name, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(p) }.padding(vertical = 6.dp),
+                    )
+                }
+                Text(
+                    "Uses OpenStreetMap's search, which is sent what you type - not your location.",
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { go() }) { Text("Search") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}
+
+/** What Siren knows about the area around a searched place, filling in as it downloads. */
+@Composable
+private fun PlaceCard(
+    place: Geocoder.Place,
+    cameras: List<Camera>,
+    hotspots: Map<String, List<PoliceData.Hotspot>>,
+    live: Map<String, List<PoliceData.LiveCall>>,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val radius = 25_000.0
+    fun near(lat: Double, lon: Double) = Odometer.distanceM(place.lat, place.lon, lat, lon) <= radius
+    val near = cameras.filter { near(it.lat, it.lon) }
+    val plate = near.count { it.kind == CameraKind.PLATE_READER }
+    val speed = near.size - plate
+    val spots = hotspots.values.flatten().filter { near(it.lat, it.lon) }
+    val calls = live.values.flatten().count { near(it.lat, it.lon) }
+    val feeds = PoliceData.feeds.collectAsStateWithLifecycle().value.filter { it.covers(place.lat, place.lon) }
+    val prefs = remember { Prefs(context) }
+    Card(modifier) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(place.name.substringBefore(", United States"), style = MaterialTheme.typography.titleSmall, maxLines = 2, modifier = Modifier.weight(1f))
+                TextButton(onClick = onClose) { Text("Close") }
+            }
+            val small = MaterialTheme.typography.bodySmall
+            Text("Within 15 mi (25 km):", style = small, color = Color.Gray)
+            Text(
+                if (!prefs.knownCameras) "Cameras: off (Settings > Cameras)"
+                else "$plate plate reader${if (plate == 1) "" else "s"}" + (if (speed > 0) ", $speed speed / red-light camera${if (speed == 1) "" else "s"}" else ""),
+                style = small,
+            )
+            val stops = spots.count { !it.isCrashes }
+            val crashes = spots.count { it.isCrashes }
+            Text(
+                when {
+                    !prefs.policeData -> "Police & traffic data: off (Settings > Police call data)"
+                    feeds.isEmpty() -> "Police & traffic data: none published for this area"
+                    else -> listOfNotNull(
+                        stops.takeIf { it > 0 }?.let { "$it traffic-stop hotspots" },
+                        crashes.takeIf { it > 0 }?.let { "$it crash hotspots" },
+                        calls.takeIf { it > 0 }?.let { "$it live police calls" },
+                    ).joinToString(", ").ifEmpty { "Downloading ${feeds.joinToString { it.name }}…" }
+                },
+                style = small,
+            )
         }
     }
 }
@@ -736,6 +864,8 @@ object MapState {
     var zoom = 15.0
     var following = true
     var orientation = 0f
+    /** The place last searched for, so its card survives switching to full screen and back. */
+    var searched: Geocoder.Place? = null
 
     fun remember(map: MapView, following: Boolean) {
         val c = map.mapCenter

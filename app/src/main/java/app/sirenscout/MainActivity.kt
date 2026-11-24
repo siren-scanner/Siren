@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
         AiGuesser.init(this)
         Flights.load(this)
         DeepLink.handle(intent)
+        MapText.load(this)
         DemoMode.maybeStart(this, intent)
         FlightWatchService.start(this) // picks up flights tracked before Siren was closed
         // On-device AI is only allowed while the app is on screen, so tie it to the resumed state.

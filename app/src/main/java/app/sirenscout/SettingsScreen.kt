@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -43,7 +44,7 @@ private enum class SettingsPage(val title: String, val summary: String) {
     CAMERAS("Cameras", "Plate readers, speed and red-light cameras on the map and alert distance"),
     AIR("Drones & aircraft", "Drones' Remote ID, police helicopters and planes"),
     SCANNING("Scanning", "Auto-optimize, Wi-Fi, screen off, turning things on"),
-    MAP("Map", "Your location marker"),
+    MAP("Map", "Your location marker, map text size"),
     RADIO("Radio (RF dongle)", "Band watch, frequencies, receiver"),
     RULES("Watch rules & hidden", "Your own signatures, hidden devices, muted trackers"),
     CAR("Car display", "Show Siren in your car's browser"),
@@ -100,7 +101,11 @@ fun SettingsScreen(onClose: () -> Unit) {
                             ScanningSettings(prefs, auto) { auto = it; prefs.autoOptimize = it }
                             AutoEnableSettings(prefs)
                         }
-                        SettingsPage.MAP -> LocationColorSetting()
+                        SettingsPage.MAP -> {
+                            LocationColorSetting()
+                            HorizontalDivider()
+                            MapTextSetting()
+                        }
                         SettingsPage.RADIO -> RadioSettings()
                         SettingsPage.RULES -> {
                             WatchRuleList()
@@ -639,6 +644,28 @@ private fun AlertNotifySettings() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(kind.label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             Switch(checked = on, onCheckedChange = { on = it; AlertNotify.setEnabled(context, kind, it) })
+        }
+    }
+}
+
+/** Bigger map text for people who find street names hard to read. */
+@Composable
+private fun MapTextSetting() {
+    val context = LocalContext.current
+    var scale by remember { mutableFloatStateOf(Prefs(context).mapTextScale) }
+    Text("Map text size", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Street names are part of the map pictures, so zooming in doesn't make them bigger - this does. Larger sizes " +
+            "show less of the area at once and look a little softer.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+        MapText.SIZES.forEach { (value, label) ->
+            androidx.compose.material3.FilterChip(
+                selected = scale == value,
+                onClick = { scale = value; MapText.set(context, value) },
+                label = { Text(label) },
+            )
         }
     }
 }

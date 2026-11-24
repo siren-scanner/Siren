@@ -237,6 +237,7 @@ private fun ManualContent() {
     Bullet("Show all zooms to fit every pin and turns the map back to north-up.")
     Bullet("The button at the top left switches between Heading up (while following you, the map turns so the way you're going points up) and North up (the map never turns). Siren remembers your choice.")
     Bullet("Full screen shows the map on its own, over everything else; Exit full screen or Back returns.")
+    Bullet("Street names hard to read? Settings > Map > Map text size draws the map bigger: Large, Extra large or Largest. Zooming in alone doesn't help, because the names are part of the map pictures and each zoom level draws them the same size.")
     Bullet("Map tiles come from OpenStreetMap and need a data connection the first time you view an area. Viewed areas are cached.")
 
     Section("Known cameras")

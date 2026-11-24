@@ -77,6 +77,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("map_heading_up", true)
         set(v) = sp.edit().putBoolean("map_heading_up", v).apply()
 
+    /** How much bigger to draw map tiles, and so their street names (1 = normal size for the screen). */
+    var mapTextScale: Float
+        get() = sp.getFloat("map_text_scale", 1f)
+        set(v) = sp.edit().putFloat("map_text_scale", v).apply()
+
     var cameraAlertM: Float
         get() = sp.getFloat("camera_alert_m", 250f)
         set(v) = sp.edit().putFloat("camera_alert_m", v).apply()

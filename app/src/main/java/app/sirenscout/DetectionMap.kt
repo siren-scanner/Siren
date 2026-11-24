@@ -124,6 +124,10 @@ fun DetectionMap(
         MapView(context).run {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            // Map tiles have their street names drawn in. Unscaled, they're drawn pixel for pixel,
+            // which makes the text tiny on sharp screens; scale them to the screen, then by choice.
+            isTilesScaledToDpi = true
+            tilesScaleFactor = MapText.scale.value
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(15.0)
             val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this) { Prefs(context).mapHeadingUp }
@@ -214,6 +218,15 @@ fun DetectionMap(
             mapView.invalidate()
         }
         MapFocus.pending.value = null
+    }
+
+    // Bigger map text, whenever the setting changes.
+    val textScale by MapText.scale.collectAsStateWithLifecycle()
+    LaunchedEffect(textScale) {
+        if (mapView.tilesScaleFactor != textScale) {
+            mapView.tilesScaleFactor = textScale
+            mapView.invalidate()
+        }
     }
 
     // Your own position marker, recoloured whenever the setting changes.
@@ -574,6 +587,19 @@ private class HeadingUpLocationOverlay(
     companion object {
         private const val MIN_HEADING_SPEED_MPS = 2.5f // ~5.6 mph
         private const val MAX_FIX_AGE_MS = 10_000L
+    }
+}
+
+/** Map text size: how much bigger map tiles (and the street names drawn in them) are shown. */
+object MapText {
+    val SIZES = listOf(1f to "Normal", 1.5f to "Large", 2f to "Extra large", 2.5f to "Largest")
+    val scale = kotlinx.coroutines.flow.MutableStateFlow(1f)
+
+    fun load(context: android.content.Context) { scale.value = Prefs(context).mapTextScale }
+
+    fun set(context: android.content.Context, v: Float) {
+        Prefs(context).mapTextScale = v
+        scale.value = v
     }
 }
 

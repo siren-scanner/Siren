@@ -64,8 +64,14 @@ object History {
         _changes.update { it + 1 }
     }
 
-    fun load(context: Context, limit: Int = 5000): List<Detection> =
-        db(context).query("encounters", null, null, null, null, null, "last_seen DESC", limit.toString()).use { c ->
+    fun load(context: Context, limit: Int = 5000): List<Detection> = query(context, null, null, limit)
+
+    /** Every saved encounter with this device (same radio and address), newest first. */
+    fun encountersOf(context: Context, source: Source, id: String, limit: Int = 200): List<Detection> =
+        query(context, "source = ? AND device_id = ?", arrayOf(source.name, id), limit)
+
+    private fun query(context: Context, where: String?, args: Array<String>?, limit: Int): List<Detection> =
+        db(context).query("encounters", null, where, args, null, null, "last_seen DESC", limit.toString()).use { c ->
             fun col(name: String) = c.getColumnIndexOrThrow(name)
             val iSource = col("source")
             val iId = col("device_id")

@@ -1,0 +1,1 @@
+Search together: several phones look for the same device at once, over Wi-Fi or a hotspot, or MeshCore and Meshtastic radios for long range.

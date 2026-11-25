@@ -579,12 +579,17 @@ private fun DetectionRow(d: Detection, now: Long, onClick: () -> Unit, onLongCli
                 d.withYou?.let {
                     Text("With you ${formatWithYou(it)}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF4FC3F7))
                 }
-                AiGuesser.lookup(d)?.takeIf { it.category != "unknown" }?.let {
-                    Text(
-                        "${it.label} ${AiGuesser.MARK} · ${it.category.replace('_', ' ')}, ${it.confidence}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (it.isOfficial) Color(0xFFFF8A65) else Color(0xFFB39DDB),
-                    )
+                AiGuesser.lookup(d)?.let {
+                    if (it.category == "unknown") {
+                        // Asked, but it couldn't tell: say so, so it's clear the AI did look (details has its reasoning).
+                        Text("AI: not sure", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    } else {
+                        Text(
+                            "${it.label} ${AiGuesser.MARK} · ${it.category.replace('_', ' ')}, ${it.confidence}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (it.isOfficial) Color(0xFFFF8A65) else Color(0xFFB39DDB),
+                        )
+                    }
                 }
                 d.guessLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF90A4AE)) }
                 Text(

@@ -220,7 +220,13 @@ fun DetailDialog(
                         }
                     }
                     if (sig != null && sig.note.isNotEmpty()) Text(sig.note, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    SeenBefore(d, onShowOnMap)
 
+                    var together by remember { mutableStateOf(false) }
+                    if (d.source != Source.RF) OutlinedButton(onClick = { together = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Search together…")
+                    }
+                    if (together) SearchTogetherDialog(d) { together = false }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (d.source != Source.RF) OutlinedButton(onClick = onWatch, modifier = Modifier.weight(1f)) { Text("Watch…") }
                         OutlinedButton(onClick = onHide, modifier = Modifier.weight(1f)) { Text("Hide…") }
@@ -313,4 +319,55 @@ private fun liveDistance(d: Detection, rssi: Int): String {
         .filter { it.key != d.key && it.rssi < 0 }
         .map { estimateMeters(it.rssi, it.source, WifiBands.mhz(it.id)) }
     return roughDistance((others + mine).min())
+}
+
+/** Every other time this same device was seen, from the history: when, how long, how strong, and where. */
+@Composable
+private fun SeenBefore(d: Detection, onShowOnMap: (Detection) -> Unit) {
+    if (d.source == Source.RF) return
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val changes by History.changes.collectAsStateWithLifecycle()
+    val past by androidx.compose.runtime.produceState<List<Detection>?>(null, d.key, changes) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { History.encountersOf(context, d.source, d.id) }.getOrDefault(emptyList())
+        }.filter { it.uid != d.uid }
+    }
+    val list = past ?: return
+    var showAll by remember { mutableStateOf(false) }
+    Text("Seen before", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
+    if (list.isEmpty()) {
+        Text("Not seen at any other time.", style = MaterialTheme.typography.bodyMedium)
+    } else {
+        val days = list.map { java.time.Instant.ofEpochMilli(it.firstSeen).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }.toSet().size
+        Text(
+            "${list.size} other time${if (list.size == 1) "" else "s"}, on $days day${if (days == 1) "" else "s"}",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        val fmtDay = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
+        val fmtTime = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+        (if (showAll) list else list.take(8)).forEach { e ->
+            val minutes = (e.lastSeen - e.firstSeen) / 60_000
+            val line = "${fmtDay.format(Date(e.firstSeen))}, ${fmtTime.format(Date(e.firstSeen))}" +
+                (if (minutes >= 1) "-${fmtTime.format(Date(e.lastSeen))} ($minutes min)" else "") +
+                " · ${e.count}× · best ${e.bestRssi} dBm"
+            val place = e.estimate?.let { it.lat to it.lon } ?: e.lat?.let { lat -> e.lon?.let { lon -> lat to lon } }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(line, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                if (place != null) TextButton(onClick = { onShowOnMap(e.copy(lat = place.first, lon = place.second)) }) { Text("Map") }
+            }
+        }
+        if (list.size > 8 && !showAll) TextButton(onClick = { showAll = true }) { Text("Show all ${list.size}") }
+    }
+    if (d.signature?.category == Category.TRACKER) {
+        Text(
+            "AirTags and other Find My or Find Hub tags change their address about once a day, so only the same day's " +
+                "sightings can be linked; a tag seen on other days shows as a new one.",
+            style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+        )
+    } else if (d.source == Source.BLE) {
+        Text(
+            "Many Bluetooth devices change their address every few minutes, so this only links sightings while the address stayed the same.",
+            style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+        )
+    }
 }

@@ -196,6 +196,7 @@ private fun ManualContent() {
     Bullet("Turn on Beep as I get closer for a Geiger-counter sound that speeds up as you approach, so you can search without watching the screen.")
     Bullet("While the details are open, the screen stays on and Bluetooth scans at full speed, even on battery, so the meter updates as fast as possible.")
     Bullet("Siren also estimates where a stationary device actually is - a parked car, a camera battery pack - from all the signal readings taken as you drove past, not just the strongest one. Its details show \"Estimated location\" with an uncertainty (for example ±35 m from 42 readings), and on the map its pin moves there with a translucent circle showing the uncertainty. One straight pass can't tell which side of the road something is on, so the circle is wide; a turn or a second pass narrows it. Devices traveling with you aren't estimated, since they don't stay in one place.")
+    Bullet("Seen before (in a device's details) lists every other time Siren saw that same device: the date and time, how long it was around, how strong it got, and a Map button for where. Trackers are kept once they've been picked up 5 or more times. Devices that change their address - AirTags once a day, many Bluetooth gadgets every few minutes - can only be linked while the address stays the same.")
     Bullet("Tap the coordinates under \"Where it was strongest\" to jump to the map, zoomed to street level on that spot with the device's pin open. Following pauses so the map stays there; tap Follow me to go back to your position.")
     Bullet("Hide (top right, or at the bottom) hides the device. You can also press and hold a card in the list to hide it without opening the details.")
 
@@ -265,6 +266,16 @@ private fun ManualContent() {
     Bullet("Crash hotspots (orange discs): where a state publishes its crash reports, places with many crashes - tap one for how many and when. Utah's come from UDOT and cover the last year or two (reports take months to appear). Settings > Police call data > Crash hotspot alerts warns as you head toward one with 15 or more; it's off by default.")
     Bullet("Covered so far: New Orleans (traffic-stop hotspots, updated daily by the city), Dallas (live calls) and all of Utah (crash hotspots). The list of cities lives on the project's GitHub page and Siren checks it daily, so new cities appear without an app update. Most places don't publish this data yet.")
     Bullet("Siren downloads each city's whole data set, so the city isn't told where you are; for statewide data like Utah's, only your area rounded to about 20 km. Live call addresses are placed on the map with OpenStreetMap's address search, which is sent the call's address - never yours.")
+
+    Section("Search together")
+    Para("Several people can look for the same device - a lost AirTag, say - at once. Every phone shares where it is and how strongly it hears the device, so all the maps show one combined estimate that narrows down much faster than one phone walking around.")
+    Bullet("Start: tap the device, then Search together… > Start. You get a 10-character code. Everyone else opens the map, taps Join a search and types it in. Any number of people can join.")
+    Bullet("The phones reach each other over the same Wi-Fi or a hotspot: one person shares their hotspot, the rest join it. Updates every 2 seconds, within about 100-200 ft of the hotspot.")
+    Bullet("On the map, the other searchers are green dots and the combined estimate is an amber circle; the card at the bottom shows who's searching, how sure the estimate is, the code, and Stop.")
+    Bullet("Messages are encrypted with the code: only phones with the same code can read or join. Nothing goes through the internet or any server.")
+    Bullet("With a MeshCore companion radio (Settings > Search together > Mesh radios), the search also reaches searchers out of Wi-Fi range - miles, with no phone signal - about every 20 seconds, slower for big teams. Siren connects to the radio itself while the search runs, so disconnect it in the MeshCore app first. Siren adds a private \"Siren search\" channel to the radio and removes it when you stop.")
+    Bullet("Meshtastic radios work the same way (Settings > Search together > Mesh radios); disconnect the radio in the Meshtastic app first. MeshCore and Meshtastic radios can't hear each other, but a phone with both - or with a radio and the hotspot - passes the search messages between them, so a mixed team still hears everyone.")
+    Bullet("Scanning must be on for a phone to add its own readings. Different phones hear a little differently, so the estimate is a likely area, not a pin-point - finish with Beep as I get closer.")
 
     Section("Drones and police aircraft")
     Para(
@@ -398,6 +409,8 @@ private fun AiSection() {
     Para("Siren can ask Gemini Nano - Google's AI model that runs entirely on the phone, on supported phones like the Pixel 10 - what an unidentified device probably is. Nothing leaves the phone. It's off until you turn on Settings > On-device AI > Use on-device AI.")
     Bullet("It only works while Siren is open on screen; Android doesn't allow apps to use it in the background. In your pocket you get the regular guesses.")
     Bullet("Every 15 seconds it looks at up to 6 devices Siren couldn't match, using their names, makers and what they advertise. Its answer appears on the card and in the details, marked (AI), with a category, a confidence and its reasoning.")
+    Bullet("When the AI looked but couldn't tell, the card says \"AI: not sure\"; its reasoning is in the details.")
+    Bullet("Siren double-checks every answer. The small model is quick to call things police: joke Wi-Fi names, home routers, home cameras, delivery trucks' trackers. So a police, fire, fleet or surveillance answer only stands when the maker really makes that kind of gear, and common look-alikes get their real name (for example \"Car's built-in Wi-Fi hotspot\" or \"Commercial truck tracker (ELD)\"); corrected answers say so in their reasoning. Real trackers are left to Siren's own tracker detection.")
     Bullet("AI guesses never trigger alerts. A device the AI calls police, fire, fleet or surveillance is highlighted in orange; one it confidently calls consumer gear is treated as everyday.")
     Bullet("Each kind of device is only asked about once - the answer is remembered, even when the device changes its address. Settings > On-device AI shows the status, lets you download the model the first time, and can forget all AI guesses.")
     Bullet("Android limits how much AI each app can use per day. If Siren hits that limit it pauses for an hour.")
@@ -419,7 +432,9 @@ private val TOPICS = listOfNotNull(
     if (AiEngine.AVAILABLE_IN_BUILD) "On-device AI" to "AI" else null,
     "Hiding devices" to "Hiding",
     "Map" to "Map",
-    "Known plate-reader cameras" to "Cameras",
+    "Known cameras" to "Cameras",
+    "Police call data" to "Police data",
+    "Search together" to "Together",
     "Drones and police aircraft" to "Air",
     "Flights" to "Flights",
     "History and export" to "History",

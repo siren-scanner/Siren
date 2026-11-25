@@ -80,7 +80,8 @@ object AiGuesser {
         guesses.value = emptyMap()
     }
 
-    fun lookup(d: Detection): AiGuess? = if (d.signature != null || d.isIdentified) null else guesses.value[key(d)]
+    fun lookup(d: Detection): AiGuess? = if (d.signature != null || d.isIdentified) null
+        else guesses.value[key(d)]?.let { AiCheck.check(d.source, d.name, AiCheck.makerOf(d), it) }
 
     /**
      * Groups devices that look alike: numbers in names are wildcarded ("Unit 14" ~ "Unit 15"),

@@ -97,6 +97,11 @@ fun DetectionMap(
     var turn by remember { mutableStateOf(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH) }
     /** "Search a place": the dialog, and the place the map was sent to (with its summary card). */
     var searching by remember { mutableStateOf(false) }
+    var joining by remember { mutableStateOf(false) }
+    val together by SearchTogether.session.collectAsStateWithLifecycle()
+    val teammates by SearchTogether.peers.collectAsStateWithLifecycle()
+    val teamEstimate by SearchTogether.estimate.collectAsStateWithLifecycle()
+    val teamLayer = remember { TeamLayer() }
     var searched by remember { mutableStateOf(MapState.searched) }
     // The location overlay reads this off the main thread, so it can't read Compose state.
     val turnNow = remember { java.util.concurrent.atomic.AtomicReference(turn) }
@@ -300,6 +305,7 @@ fun DetectionMap(
         AndroidView(factory = { mapView }, update = { map ->
             if (showCameras) cameraLayer.update(map, wantedCameras, zoom)
             if (showPolice) policeLayer.update(map, hotspots, liveCalls, zoom)
+            teamLayer.update(map, together, teammates, teamEstimate)
             airLayer.update(map, air)
             // Update markers in place so an open info window survives new scan results.
             val keys = located.mapTo(HashSet()) { it.uid }
@@ -367,6 +373,7 @@ fun DetectionMap(
                 })
             }
             FilledTonalButton(onClick = { searching = true }, contentPadding = small) { Text("Search a place") }
+            if (together == null) FilledTonalButton(onClick = { joining = true }, contentPadding = small) { Text("Join a search") }
             onFullScreen?.let { open ->
                 FilledTonalButton(onClick = open, contentPadding = small) { Text(if (fullScreen) "Exit full screen" else "Full screen") }
             }
@@ -416,7 +423,10 @@ fun DetectionMap(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
             )
         }
-        searched?.let { place ->
+        if (joining) JoinSearchDialog { joining = false }
+        if (together != null && chosen == null) {
+            SearchCard(Modifier.align(Alignment.BottomStart).padding(8.dp).fillMaxWidth(0.72f))
+        } else searched?.let { place ->
             if (chosen == null) PlaceCard(
                 place, cameras, hotspots, liveCalls,
                 onClose = { searched = null; MapState.searched = null },
@@ -660,6 +670,56 @@ private class AirLayer {
                 op.snippet = "Where the drone says its operator is (${c.detail})"
             }
         }
+    }
+}
+
+/** Search together: the other searchers (green dots) and everyone's combined estimate (amber circle). */
+private class TeamLayer {
+    private var shown: Triple<Any?, Any?, Any?>? = null
+    private val overlays = mutableListOf<Overlay>()
+
+    fun update(
+        map: MapView,
+        session: SearchTogether.Session?,
+        peers: Map<Int, SearchTogether.Peer>,
+        estimate: LocationEstimate?,
+    ) {
+        val key = Triple(session, peers, estimate)
+        if (shown == key) return
+        shown = key
+        overlays.forEach { (it as? Marker)?.closeInfoWindow() }
+        map.overlays.removeAll(overlays.toSet())
+        overlays.clear()
+        if (session == null) { map.invalidate(); return }
+        val ctx = map.context
+        val peerIcon = android.graphics.drawable.BitmapDrawable(map.resources, LocationMarker.dot(ctx, 0xFF43A047.toInt()))
+        for (p in peers.values) {
+            if (p.lat == null || p.lon == null) continue
+            overlays += Marker(map).apply {
+                position = GeoPoint(p.lat, p.lon)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = peerIcon
+                title = p.name
+                snippet = "Searching with you · via ${p.via}"
+            }
+        }
+        if (estimate != null) {
+            overlays += Polygon(map).apply {
+                points = Polygon.pointsAsCircle(GeoPoint(estimate.lat, estimate.lon), estimate.radiusM)
+                fillPaint.color = 0x40FFB300
+                outlinePaint.color = 0xE0FFB300.toInt()
+                outlinePaint.strokeWidth = 4f
+                setOnClickListener { _, _, _ -> false }
+            }
+            overlays += Marker(map).apply {
+                position = GeoPoint(estimate.lat, estimate.lon)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                title = session.target?.label ?: "Search target"
+                snippet = "Everyone's readings together: ±${formatShortDistance(estimate.radiusM)}, from ${estimate.readings} readings"
+            }
+        }
+        map.overlays.addAll(overlays)
+        map.invalidate()
     }
 }
 

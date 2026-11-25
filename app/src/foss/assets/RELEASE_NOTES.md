@@ -2,6 +2,30 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.88 · Nov 25, 2026
+- Fixed: the Cameras button in the user manual jumped to the top instead of the cameras section, and the Police call data and Search together sections now have buttons too.
+
+## 1.0.87 · Nov 25, 2026
+- Settings > Search together has one list of mesh radios: tick the one you are carrying (or a MeshCore and a Meshtastic radio to bridge them). Siren works out which kind each is.
+
+## 1.0.86 · Nov 25, 2026
+- Settings > Search together: each radio list only shows its own kind (MeshCore or Meshtastic), and the search card shows the full name of what you are looking for. Meshtastic verified on a T-Echo: Siren connects and sets up its search channel.
+
+## 1.0.85 · Nov 25, 2026
+- Search together over Meshtastic: pick your Meshtastic radio in Settings > Search together, and searches reach other Meshtastic searchers miles away. A phone with both a MeshCore and a Meshtastic radio (or a radio and the hotspot) passes messages between them, so mixed teams hear each other.
+
+## 1.0.84 · Nov 24, 2026
+- The mesh radio picker in Settings > Search together now only lists mesh radios (MeshCore, Meshtastic and common radio boards), with Show all paired devices for anything else. Search together over MeshCore verified radio to radio between two T-Echos.
+
+## 1.0.83 · Nov 24, 2026
+- Search together over MeshCore: pick your paired MeshCore companion radio in Settings > Search together, and searches also reach other searchers miles away without phone signal (updates about every 20 seconds). Siren connects to the radio itself during a search, adds a private "Siren search" channel and removes it afterwards.
+
+## 1.0.82 · Nov 24, 2026
+- Search together: several people can look for the same device at once. Tap a device > Search together… to get a code; others tap Join a search on the map. Phones on the same Wi-Fi or hotspot share positions and readings every 2 seconds, encrypted with the code, and every map shows the other searchers and one combined estimate.
+
+## 1.0.81 · Nov 24, 2026
+- Seen before: a device's details now list every other time Siren saw it - when, for how long, how strong, and where (Map). Trackers seen 5+ times are now kept in history so they have one too.
+
 ## 1.0.79 · Nov 24, 2026
 - Suggest a place: Settings > Police call data > Suggest a place to add (and a link on the Search a place card) opens a short form on the project page to ask for a city, county or state to be added.
 

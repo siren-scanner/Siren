@@ -105,6 +105,35 @@ class Prefs(context: Context) {
         get() = sp.getInt("map_cache_mb", MapCache.DEFAULT_MB)
         set(v) = sp.edit().putInt("map_cache_mb", v).apply()
 
+    /** The name other searchers see in Search together. */
+    var searchName: String
+        // The phone's model ("Pixel 10 Pro") unless you typed a name; the first build's default
+        // ("Searcher" + the model's last 4 letters) counts as untyped.
+        get() = sp.getString("search_name", null)?.takeIf { it != "Searcher ${android.os.Build.MODEL.takeLast(4)}" }
+            ?: android.os.Build.MODEL.take(24)
+        set(v) = sp.edit().putString("search_name", v.trim().take(24)).apply()
+
+    /** The MeshCore companion radio Search together uses ("" = none): Bluetooth address and name. */
+    var meshcoreRadio: String
+        get() = sp.getString("meshcore_radio", "") ?: ""
+        set(v) = sp.edit().putString("meshcore_radio", v).apply()
+    /**
+     * The mesh radios Search together uses (Bluetooth addresses; MeshCore or Meshtastic, told
+     * apart when a search starts). Older versions kept one of each kind; those carry over.
+     */
+    var meshRadios: Set<String>
+        get() = sp.getStringSet("mesh_radios", null)?.toSet()
+            ?: setOf(meshcoreRadio, meshtasticRadio).filter { it.isNotEmpty() }.toSet()
+        set(v) = sp.edit().putStringSet("mesh_radios", v).apply()
+
+    /** The Meshtastic radio Search together uses ("" = none). */
+    var meshtasticRadio: String
+        get() = sp.getString("meshtastic_radio", "") ?: ""
+        set(v) = sp.edit().putString("meshtastic_radio", v).apply()
+    var meshcoreRadioName: String
+        get() = sp.getString("meshcore_radio_name", "") ?: ""
+        set(v) = sp.edit().putString("meshcore_radio_name", v).apply()
+
     var cameraAlertM: Float
         get() = sp.getFloat("camera_alert_m", 250f)
         set(v) = sp.edit().putFloat("camera_alert_m", v).apply()

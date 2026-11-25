@@ -614,8 +614,10 @@ class ScanService : Service() {
     @Synchronized
     private fun saveHistory() {
         val dirty = Detections.items.value.values.filter { d ->
+            // Trackers pass by constantly; keep the ones that alerted, or stayed around long enough to
+            // matter (so their "Seen before" history exists), not every AirTag in passing traffic.
             val keep = d.signature != null &&
-                (d.signature.category != Category.TRACKER || d.uid in alertedTrackers)
+                (d.signature.category != Category.TRACKER || d.uid in alertedTrackers || d.count >= TRACKER_KEEP_SIGHTINGS)
             keep && savedAt[d.uid] != d.lastSeen
         }.map { d -> Detections.estimate(d)?.let { d.copy(estimate = it) } ?: d }
         History.save(this, dirty)
@@ -633,6 +635,7 @@ class ScanService : Service() {
         val prev = lastLocation
         // Prefer a fresh GPS fix, but don't let a coarse network fix replace a recent precise one.
         if (prev == null || loc.time - prev.time > 10_000 || loc.accuracy <= prev.accuracy) lastLocation = loc
+        lastLocation?.let { SearchTogether.myLat = it.latitude; SearchTogether.myLon = it.longitude }
         checkKnownCameras(loc)
         checkPoliceData(loc)
     }
@@ -895,6 +898,7 @@ class ScanService : Service() {
         private const val AIRCRAFT_POLL_MS = 30_000L
         private val REMOTE_ID_UUID: ParcelUuid = ParcelUuid.fromString(RemoteId.BLE_SERVICE_UUID)
         private const val CAMERA_REALERT_MS = 15 * 60_000L
+        private const val TRACKER_KEEP_SIGHTINGS = 5
         private const val HOTSPOT_REALERT_MS = 30 * 60_000L
         /** Only places with at least this many stops in the period alert; quieter ones are just on the map. */
         private const val HOTSPOT_ALERT_MIN = 10

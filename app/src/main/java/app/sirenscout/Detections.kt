@@ -124,6 +124,7 @@ object Detections {
     private const val MAX_READINGS = 300
 
     private fun addReading(key: String, location: Location, rssi: Int, now: Long) {
+        SearchTogether.onLocalReading(key, location.latitude, location.longitude, rssi, now)
         val list = readings.getOrPut(key) { ArrayDeque() }
         val last = list.lastOrNull()
         val r = Reading(location.latitude, location.longitude, rssi.toDouble(), now)

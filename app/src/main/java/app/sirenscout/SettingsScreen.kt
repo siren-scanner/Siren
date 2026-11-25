@@ -46,6 +46,7 @@ private enum class SettingsPage(val title: String, val summary: String) {
     AIR("Drones & aircraft", "Drones' Remote ID, police helicopters and planes"),
     SCANNING("Scanning", "Auto-optimize, Wi-Fi, screen off, turning things on"),
     MAP("Map", "Your location marker, map text size"),
+    TOGETHER("Search together", "Your name and mesh radio for searching with other people"),
     STORAGE("Storage", "How much map and downloaded data Siren keeps on the phone"),
     RADIO("Radio (RF dongle)", "Band watch, frequencies, receiver"),
     RULES("Watch rules & hidden", "Your own signatures, hidden devices, muted trackers"),
@@ -110,6 +111,7 @@ fun SettingsScreen(onClose: () -> Unit) {
                             MapTextSetting()
                         }
                         SettingsPage.STORAGE -> StorageSettings()
+                        SettingsPage.TOGETHER -> SearchTogetherSettings()
                         SettingsPage.RADIO -> RadioSettings()
                         SettingsPage.RULES -> {
                             WatchRuleList()
@@ -815,3 +817,69 @@ private fun StorageSettings() {
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
 }
+
+/** Search together: the name others see, and a MeshCore radio for long-range searches. */
+@android.annotation.SuppressLint("MissingPermission")
+@Composable
+private fun SearchTogetherSettings() {
+    val context = LocalContext.current
+    val prefs = Prefs(context)
+    var name by remember { mutableStateOf(prefs.searchName) }
+    androidx.compose.material3.OutlinedTextField(
+        value = name, onValueChange = { name = it.take(24); prefs.searchName = name },
+        label = { Text("Your name (other searchers see it)") }, singleLine = true,
+    )
+    HorizontalDivider()
+    Text("Mesh radios", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Tick the MeshCore or Meshtastic radio you'll carry, and searches also reach other searchers miles away without " +
+            "phone signal - slower, every 20 seconds or so. Siren connects to the radio itself while a search runs, so its " +
+            "own app is disconnected until you stop. Tick two (a MeshCore and a Meshtastic radio) and your phone passes " +
+            "messages between them, so a mixed team hears each other. Pair a radio with this phone first (in its app or " +
+            "Bluetooth settings).",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    var showAll by remember { mutableStateOf(false) }
+    var chosen by remember { mutableStateOf(prefs.meshRadios) }
+    val paired = remember {
+        runCatching {
+            context.getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter?.bondedDevices
+                ?.filter { it.type != android.bluetooth.BluetoothDevice.DEVICE_TYPE_CLASSIC }
+                ?.map { Radio(it.address, it.name ?: it.address, MeshRadios.looksLikeRadio(it), MeshRadios.kind(it)) }?.sortedBy { it.label }
+        }.getOrNull().orEmpty()
+    }
+    // Earbuds, watches and cars are paired too: only mesh radios unless asked (and any already ticked).
+    val shown = paired.filter { showAll || it.mesh || it.address in chosen }
+    fun toggle(addr: String) {
+        chosen = if (addr in chosen) chosen - addr else chosen + addr
+        prefs.meshRadios = chosen
+    }
+    shown.forEach { r ->
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { toggle(r.address) }) {
+            androidx.compose.material3.Checkbox(checked = r.address in chosen, onCheckedChange = { toggle(r.address) })
+            Column {
+                Text(r.label)
+                Text(
+                    when (r.kind) {
+                        MeshRadios.Kind.MESHCORE -> "MeshCore"
+                        MeshRadios.Kind.MESHTASTIC -> "Meshtastic"
+                        MeshRadios.Kind.UNKNOWN -> if (r.mesh) "kind checked when a search starts" else "not a known radio"
+                    },
+                    style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                )
+            }
+        }
+    }
+    if (shown.isEmpty()) Text(
+        if (paired.isEmpty()) "No paired Bluetooth LE devices yet." else "No mesh radios among this phone's paired devices.",
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (!showAll && paired.size > shown.size) TextButton(onClick = { showAll = true }) { Text("Show all paired devices") }
+    Text(
+        "Siren adds a private search channel to the radio (its key comes from the search code) and removes it afterwards. " +
+            "Its messages are data, so they don't show up as chat.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+}
+
+private data class Radio(val address: String, val label: String, val mesh: Boolean, val kind: MeshRadios.Kind)

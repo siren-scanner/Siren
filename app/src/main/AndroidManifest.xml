@@ -12,6 +12,8 @@
 
     <!-- Wi-Fi scanning -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Search together over a hotspot: receive the other phones' broadcast messages. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
 

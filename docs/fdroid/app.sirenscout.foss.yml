@@ -19,9 +19,9 @@ RepoType: git
 Repo: https://github.com/siren-scanner/Siren.git
 
 Builds:
-  - versionName: 1.0.79
-    versionCode: 81
-    commit: 3aa9abab5c2e05e3b856d859e1e0018d91e3073e
+  - versionName: 1.0.88
+    versionCode: 90
+    commit: d8db7687c633d44339fee0a18a751498694b1b22
     subdir: app
     prebuild:
       # Google libraries are only used by the maintainer's own (non-foss) editions.
@@ -32,5 +32,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.0.79
-CurrentVersionCode: 81
+CurrentVersion: 1.0.88
+CurrentVersionCode: 90

@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.78 · Nov 24, 2026
+- Fixed: classic Bluetooth devices were never listed. Android found them, but its Bluetooth app's results didn't reach Siren; the Bluetooth tab now fills in with discoverable devices (in-car computers, radios and anything in pairing mode).
+
 ## 1.0.77 · Nov 24, 2026
 - Settings > Storage: choose how much space saved map pictures may use (50-500 MB, 100 MB by default), clear them, and see or clear the downloaded police, crash and aircraft data.
 

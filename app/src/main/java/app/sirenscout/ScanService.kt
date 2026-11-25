@@ -107,12 +107,20 @@ class ScanService : Service() {
         Detections.setStatus { ScanStatus(running = true) }
         ScanHealth.started()
 
-        val filter = IntentFilter().apply {
-            addAction(BluetoothDevice.ACTION_FOUND)
-            addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
-            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
-        }
-        ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(
+            this, receiver, IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        // Classic discovery results come from the Bluetooth app, not the core system, so a
+        // not-exported receiver never gets them (Siren saw 0 classic devices for this reason).
+        // These are protected broadcasts: only the system and Bluetooth can send them.
+        ContextCompat.registerReceiver(
+            this, btReceiver,
+            IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_FOUND)
+                addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            },
+            ContextCompat.RECEIVER_EXPORTED,
+        )
         ContextCompat.registerReceiver(
             this, screenReceiver,
             IntentFilter().apply {
@@ -161,6 +169,7 @@ class ScanService : Service() {
         if (started) {
             runCatching { saveHistory() }
             unregisterReceiver(receiver)
+            unregisterReceiver(btReceiver)
             unregisterReceiver(screenReceiver)
             stopScreenOffScan()
             runCatching { btAdapter?.bluetoothLeScanner?.stopScan(bleCallback) }
@@ -368,6 +377,11 @@ class ScanService : Service() {
             }
         }
         Detections.setStatus { it.copy(wifi = "${fresh.size} networks in range · every ${wifiEverySeconds}s") }
+    }
+
+    /** Bluetooth's broadcasts, handled by [receiver]. */
+    private val btReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = receiver.onReceive(context, intent)
     }
 
     private val receiver = object : BroadcastReceiver() {

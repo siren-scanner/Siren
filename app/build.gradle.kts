@@ -14,8 +14,8 @@ android {
         applicationId = "app.sirenscout"
         minSdk = 26
         targetSdk = 35
-        versionCode = 79
-        versionName = "1.0.77"
+        versionCode = 80
+        versionName = "1.0.78"
     }
 
     // Private settings for the maintainer's own builds, kept out of the shared code: the self-update

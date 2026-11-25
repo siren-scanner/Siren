@@ -1,0 +1,1 @@
+Check for updates in Settings opens the newest GitHub release (copies from F-Droid update through F-Droid).

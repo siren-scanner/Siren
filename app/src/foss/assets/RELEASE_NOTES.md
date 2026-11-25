@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.89 · Nov 25, 2026
+- Updates in the public version: Settings > Backup, sharing & updates > Check for updates asks GitHub for the newest version and opens its release page. Copies installed from F-Droid say to update there instead.
+
 ## 1.0.88 · Nov 25, 2026
 - Fixed: the Cameras button in the user manual jumped to the top instead of the cameras section, and the Police call data and Search together sections now have buttons too.
 

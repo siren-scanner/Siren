@@ -139,6 +139,9 @@ fun SettingsScreen(onClose: () -> Unit) {
                             if (SELF_UPDATES) {
                                 HorizontalDivider()
                                 UpdateSettings(Prefs(context))
+                            } else if (BuildConfig.REPO_URL.isNotEmpty()) {
+                                HorizontalDivider()
+                                PublicUpdateSettings()
                             }
                         }
                         SettingsPage.AI -> AiSettings()
@@ -883,3 +886,54 @@ private fun SearchTogetherSettings() {
 }
 
 private data class Radio(val address: String, val label: String, val mesh: Boolean, val kind: MeshRadios.Kind)
+
+/** The public edition's updates: check GitHub on request and open the release page. */
+@Composable
+private fun PublicUpdateSettings() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val fromProject = remember { GitHubUpdates.signedByProject(context) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var newer by remember { mutableStateOf<GitHubUpdates.Latest?>(null) }
+    var checking by remember { mutableStateOf(false) }
+    fun open(url: String) = runCatching {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+    }
+    Text("Updates", style = MaterialTheme.typography.titleSmall)
+    if (!fromProject) {
+        Text(
+            "Version ${appVersion(context)}, installed from F-Droid (or another store), so it updates there - a copy from " +
+                "GitHub can't install over it.",
+            style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+        )
+        return
+    }
+    Text(
+        "Version ${appVersion(context)}. Siren doesn't update itself: check here, then download the new version from the " +
+            "release page and open it to install. Your data is kept.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(enabled = !checking, onClick = {
+            checking = true; message = null; newer = null
+            scope.launch {
+                val r = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { GitHubUpdates.latest() } }
+                checking = false
+                r.onSuccess { latest ->
+                    if (GitHubUpdates.compare(latest.version, BuildConfig.VERSION_NAME) > 0) {
+                        newer = latest; message = "Siren ${latest.version} is available."
+                    } else message = "You're up to date."
+                }.onFailure { message = "Couldn't check - is there an internet connection?" }
+            }
+        }) { Text(if (checking) "Checking…" else "Check for updates") }
+        OutlinedButton(onClick = { open(newer?.url ?: GitHubUpdates.releasesUrl) }) {
+            Text(if (newer != null) "Get ${newer!!.version}" else "Latest release")
+        }
+    }
+    message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    Text(
+        "Checking asks GitHub for the newest version number; nothing else is sent. Or add this project to Obtainium to " +
+            "get updates automatically.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+}

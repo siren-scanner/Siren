@@ -542,7 +542,7 @@ private fun PlaceCard(
             Text(
                 when {
                     !prefs.policeData -> "Police & traffic data: off (Settings > Police call data)"
-                    feeds.isEmpty() -> "Police & traffic data: none published for this area"
+                    feeds.isEmpty() -> "Police & traffic data: none on Siren's list for this area"
                     else -> listOfNotNull(
                         stops.takeIf { it > 0 }?.let { "$it traffic-stop hotspots" },
                         crashes.takeIf { it > 0 }?.let { "$it crash hotspots" },
@@ -551,6 +551,12 @@ private fun PlaceCard(
                 },
                 style = small,
             )
+            if (feeds.isEmpty()) PoliceData.suggestPlaceUrl(place.name.substringBefore(", United States"))?.let { url ->
+                TextButton(
+                    onClick = { runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) } },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                ) { Text("Suggest adding this place") }
+            }
         }
     }
 }

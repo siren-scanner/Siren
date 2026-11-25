@@ -732,6 +732,17 @@ private fun PoliceDataSettings() {
             "some calls are left out or delayed by the city.",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
+    PoliceData.suggestPlaceUrl(null)?.let { url ->
+        HorizontalDivider()
+        Text(
+            "Know a city, county or state that publishes police calls or crash reports? Suggest it - once it's on the list, " +
+                "every Siren gets it within a day.",
+            style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+        )
+        OutlinedButton(onClick = {
+            runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) }
+        }) { Text("Suggest a place to add") }
+    }
 }
 
 /** What Siren keeps on the phone, and limits for it. */

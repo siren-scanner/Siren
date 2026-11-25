@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.79 · Nov 24, 2026
+- Suggest a place: Settings > Police call data > Suggest a place to add (and a link on the Search a place card) opens a short form on the project page to ask for a city, county or state to be added.
+
 ## 1.0.78 · Nov 24, 2026
 - Fixed: classic Bluetooth devices were never listed. Android found them, but its Bluetooth app's results didn't reach Siren; the Bluetooth tab now fills in with discoverable devices (in-car computers, radios and anything in pairing mode).
 

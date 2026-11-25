@@ -119,6 +119,18 @@ object PoliceData {
 
     private fun dir(context: Context) = File(context.filesDir, "police_data").apply { mkdirs() }
 
+    /**
+     * The project page's "Add a place" form, filled in with [place]; null in builds without a
+     * project page (the maintainer's own).
+     */
+    fun suggestPlaceUrl(place: String?): String? {
+        if (BuildConfig.REPO_URL.isEmpty()) return null
+        fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+        val p = place?.trim().orEmpty()
+        return "${BuildConfig.REPO_URL}/issues/new?template=add_a_place.yml&title=" + enc("Add a place: $p") +
+            (if (p.isNotEmpty()) "&place=" + enc(p) else "")
+    }
+
     // --- The feed list ---
 
     internal fun parseRegistry(json: String): List<Feed> {

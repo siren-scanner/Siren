@@ -1,0 +1,39 @@
+name: Add a place's police or traffic data
+description: Suggest a city, county or state for Siren's police call and crash data
+title: "Add a place: "
+labels: [place]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Siren can show traffic-stop hotspots, live police calls and crash hotspots wherever a city or
+        state publishes that data. Tell us where, and a link to the data if you know one - it gets
+        added to [police_feeds.json](https://github.com/siren-scanner/Siren/blob/main/app/src/main/assets/police_feeds.json)
+        and reaches every Siren within a day, no app update needed.
+  - type: input
+    id: place
+    attributes:
+      label: Place
+      description: City, county or state.
+      placeholder: Little Rock, Arkansas
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Link to the data (if you know it)
+      description: An open-data page for police calls for service, active calls, or crash reports.
+      placeholder: https://data.example.gov/...
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of data?
+      options:
+        - Not sure
+        - Police calls for service (past calls)
+        - Live / active police calls
+        - Crash reports
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?

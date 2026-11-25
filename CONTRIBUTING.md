@@ -20,7 +20,8 @@ problem.
 
 If your city or county publishes police calls as open data, Siren can use it. Add an entry to
 [`app/src/main/assets/police_feeds.json`](app/src/main/assets/police_feeds.json) and open a pull
-request (or open an issue with the link to the data). Siren reads the newest copy of that file from
+request, or use the [Add a place form](https://github.com/siren-scanner/Siren/issues/new?template=add_a_place.yml)
+(also in the app: Settings > Police call data > Suggest a place to add). Siren reads the newest copy of that file from
 GitHub every day, so a new city works for everyone without an app update.
 
 - `"mode": "history"` - a data set of past calls with a map position (`pointField`) and time

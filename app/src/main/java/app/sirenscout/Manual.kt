@@ -263,7 +263,7 @@ private fun ManualContent() {
     Bullet("While driving toward a hotspot with at least 10 stops, you get an alert with the camera chime, at most every 30 minutes per place.")
     Bullet("Live police calls (blue dots): where a city publishes its active calls, they show on the map with the call type and status, refreshed every 2 minutes.")
     Bullet("Crash hotspots (orange discs): where a state publishes its crash reports, places with many crashes - tap one for how many and when. Utah's come from UDOT and cover the last year or two (reports take months to appear). Settings > Police call data > Crash hotspot alerts warns as you head toward one with 15 or more; it's off by default.")
-    Bullet("Covered so far: New Orleans (traffic-stop hotspots, updated daily by the city), Dallas (live calls) and all of Utah (crash hotspots). The list of cities lives on the project's GitHub page and Siren checks it daily, so new cities appear without an app update. Most places don't publish this data, including the Mississippi coast.")
+    Bullet("Covered so far: New Orleans (traffic-stop hotspots, updated daily by the city), Dallas (live calls) and all of Utah (crash hotspots). The list of cities lives on the project's GitHub page and Siren checks it daily, so new cities appear without an app update. Most places don't publish this data yet.")
     Bullet("Siren downloads each city's whole data set, so the city isn't told where you are; for statewide data like Utah's, only your area rounded to about 20 km. Live call addresses are placed on the map with OpenStreetMap's address search, which is sent the call's address - never yours.")
 
     Section("Drones and police aircraft")

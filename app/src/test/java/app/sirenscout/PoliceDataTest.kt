@@ -18,7 +18,7 @@ class PoliceDataTest {
         val utah = feeds.first { it.id == "utah-crashes" }
         assertTrue(utah.type == "arcgis" && utah.kind == "crashes" && utah.layers.isNotEmpty())
         assertTrue(utah.covers(41.16, -112.03))     // Roy
-        assertTrue(!utah.covers(30.37, -89.09))     // the Mississippi coast
+        assertTrue(!utah.covers(33.75, -84.39))     // Atlanta
         assertTrue(nola.covers(29.95, -90.07) && !nola.covers(41.16, -112.03))
         assertTrue(!nola.live && nola.pointField == "location" && nola.datasets.size == 2)
         val dallas = feeds.first { it.id == "dallas-live" }

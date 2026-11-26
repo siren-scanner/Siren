@@ -256,7 +256,10 @@ class ScanService : Service() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> if (AutoTune.screenOffScan(prefs)) startScreenOffScan()
-                Intent.ACTION_SCREEN_ON -> stopScreenOffScan()
+                Intent.ACTION_SCREEN_ON -> {
+                    stopScreenOffScan()
+                    wifiWake.trySend(Unit) // try a fast Wi-Fi scan now that the screen is on
+                }
             }
         }
     }
@@ -321,6 +324,8 @@ class ScanService : Service() {
     /** When Android last refused a scan; fast scans are retried a while after. */
     private var wifiRefusedAt = -1L
     private var wifiEverySeconds = WIFI_INTERVAL_MS / 1000
+    /** Nudged when the screen comes on, so a fast scan is tried right away instead of after the wait. */
+    private val wifiWake = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
     private fun startWifi() = scope.launch {
         val w = wifi ?: return@launch
@@ -339,14 +344,20 @@ class ScanService : Service() {
                 if (fastStreak > 4) WifiThrottle.detectedOff = true
             } else {
                 fastStreak = 0
-                wifiRefusedAt = now
-                if (fast) WifiThrottle.detectedOff = false
+                // With the screen off Android refuses scans whatever the throttling setting, so only a
+                // refusal with the screen on says fast scans aren't allowed on this phone. (Counting the
+                // screen-off ones kept restarting the 10-minute wait, so fast scans never came back.)
+                val screenOn = getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
+                if (screenOn) {
+                    wifiRefusedAt = now
+                    if (fast) WifiThrottle.detectedOff = false
+                }
                 ScanHealth.wifiRefused()
                 Detections.setStatus { it.copy(wifi = "scan throttled; using passive results") }
             }
             wifiEverySeconds = (if (fast && requested) FAST_WIFI_INTERVAL_MS else WIFI_INTERVAL_MS) / 1000
             // Android allows 4 scans per 2 minutes for a foreground app unless throttling is off.
-            delay(wifiEverySeconds * 1000)
+            kotlinx.coroutines.withTimeoutOrNull(wifiEverySeconds * 1000) { wifiWake.receive() }
         }
     }
 

@@ -1,0 +1,1 @@
+Fixed: Wi-Fi scanning now returns to every 8 seconds after the screen has been off.

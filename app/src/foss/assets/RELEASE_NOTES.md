@@ -2,6 +2,9 @@
 
 Newest first. Each release adds a "## <version> · <date>" section with "- " bullets.
 
+## 1.0.90 · Nov 25, 2026
+- Fixed: after the screen had been off, Wi-Fi scanning stayed at every 31 seconds instead of going back to every 8. Scans Android refuses while the screen is off no longer count against fast scanning, and a fast scan is tried as soon as the screen comes on.
+
 ## 1.0.89 · Nov 25, 2026
 - Updates in the public version: Settings > Backup, sharing & updates > Check for updates asks GitHub for the newest version and opens its release page. Copies installed from F-Droid say to update there instead.
 

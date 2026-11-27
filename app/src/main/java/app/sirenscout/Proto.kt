@@ -50,7 +50,7 @@ internal class ProtoReader(private val b: ByteArray) {
                 when ((key and 7).toInt()) {
                     0 -> list += Field(field, varint())
                     1 -> { list += Field(field, (0 until 8).fold(0L) { a, k -> a or ((b[i + k].toLong() and 0xFF) shl (8 * k)) }); i += 8 }
-                    2 -> { val n = varint().toInt(); list += Field(field, bytes = b.copyOfRange(i, i + n)); i += n }
+                    2 -> { val len = varint(); if (len < 0 || len > b.size - i) return list; val n = len.toInt(); list += Field(field, bytes = b.copyOfRange(i, i + n)); i += n }
                     5 -> { list += Field(field, (0 until 4).fold(0L) { a, k -> a or ((b[i + k].toLong() and 0xFF) shl (8 * k)) }); i += 4 }
                     else -> return list // groups aren't used by Meshtastic
                 }

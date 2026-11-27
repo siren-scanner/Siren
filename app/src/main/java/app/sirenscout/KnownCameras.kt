@@ -120,6 +120,8 @@ object KnownCameras {
         AppLog.i("Known cameras: ${fetched.size} downloaded, ${merged.size} cached")
     }
 
+    private const val MAX_RESPONSE_BYTES = 20_000_000
+
     internal fun roundForQuery(deg: Double) = Math.round(deg * 10) / 10.0
 
     private fun fetch(url: String, lat: Double, lon: Double): List<Camera> {
@@ -135,7 +137,13 @@ object KnownCameras {
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
             conn.outputStream.use { it.write("data=${URLEncoder.encode(query, "UTF-8")}".toByteArray()) }
             if (conn.responseCode != 200) throw IllegalStateException("Overpass HTTP ${conn.responseCode}")
-            val json = JSONObject(conn.inputStream.bufferedReader().readText())
+            val json = JSONObject(
+                conn.inputStream.use { s ->
+                    val bytes = s.readNBytes(MAX_RESPONSE_BYTES + 1)
+                    if (bytes.size > MAX_RESPONSE_BYTES) throw IllegalStateException("Overpass response too large")
+                    String(bytes, Charsets.UTF_8)
+                }
+            )
             return parseOverpass(json)
         } finally {
             conn.disconnect()

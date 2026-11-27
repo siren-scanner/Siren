@@ -108,6 +108,7 @@ object Updater {
     private fun get(url: String): ByteArray {
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
+            conn.instanceFollowRedirects = false
             conn.connectTimeout = 10_000
             conn.readTimeout = 60_000
             if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode}")
@@ -124,6 +125,7 @@ class InstallResultReceiver : BroadcastReceiver() {
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
+                    ?.takeIf { it.action == "android.content.pm.action.CONFIRM_INSTALL" || it.component?.packageName?.contains("packageinstaller") == true }
                     ?.let { context.startActivity(it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
             PackageInstaller.STATUS_SUCCESS -> AppLog.i("Update installed")

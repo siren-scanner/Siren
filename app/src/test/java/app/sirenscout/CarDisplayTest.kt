@@ -78,6 +78,6 @@ class CarDisplayTest {
 
     @Test
     fun `new codes are 8 characters`() {
-        assertTrue(Regex("^[a-z2-9]{8}$").matches(CarDisplay.newCode()))
+        assertTrue(Regex("^[a-z2-9]{12}$").matches(CarDisplay.newCode()))
     }
 }

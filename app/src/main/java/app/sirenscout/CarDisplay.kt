@@ -50,6 +50,10 @@ object CarDisplay {
     private const val MAX_FAILURES = 10
     private val failures = HashMap<String, Int>()
 
+    /** Wrong codes across all addresses, so rotating addresses doesn't get around the per-address limit. */
+    private const val MAX_TOTAL_FAILURES = 50
+    private var totalFailures = 0
+
     /** Records an alert for the page to show; called wherever a notification goes out. */
     fun publishAlert(title: String, text: String) {
         lastAlert = Alert(title, text, System.currentTimeMillis())
@@ -58,7 +62,7 @@ object CarDisplay {
     fun newCode(): String {
         val alphabet = "abcdefghjkmnpqrstuvwxyz23456789" // no look-alikes, easy to type on a car screen
         val rnd = SecureRandom()
-        return (1..8).map { alphabet[rnd.nextInt(alphabet.length)] }.joinToString("")
+        return (1..12).map { alphabet[rnd.nextInt(alphabet.length)] }.joinToString("")
     }
 
     @Synchronized
@@ -115,7 +119,7 @@ object CarDisplay {
         }
         if (!isPrivate(client.inetAddress)) return // not from a local / hotspot device
         if (!allowedHere(client.localAddress)) return // e.g. someone else on a café's Wi-Fi
-        if ((synchronized(failures) { failures[from] } ?: 0) >= MAX_FAILURES) return
+        if (synchronized(failures) { totalFailures >= MAX_TOTAL_FAILURES || (failures[from] ?: 0) >= MAX_FAILURES }) return
         val reader = client.getInputStream().bufferedReader()
         val requestLine = reader.readLine() ?: return
         while (true) { val h = reader.readLine() ?: break; if (h.isEmpty()) break } // skip headers
@@ -137,7 +141,10 @@ object CarDisplay {
             "/$code/" -> send("200 OK", "text/html; charset=utf-8", PAGE)
             "/$code/state" -> send("200 OK", "application/json", state().toString())
             else -> {
-                synchronized(failures) { failures[from] = (failures[from] ?: 0) + 1 }
+                synchronized(failures) {
+                    totalFailures++
+                    if (failures.size < 1_000) failures[from] = (failures[from] ?: 0) + 1
+                }
                 send("404 Not Found", "text/plain", "Not found")
             }
         }

@@ -20,7 +20,8 @@ object Backup {
      * backups and never restored from one, so a backup file someone hands you can't point your
      * phone's sync, car page or updates at their own device.
      */
-    internal val PRIVATE_KEYS = setOf("car_code", "sync_code", "sync_serve", "sync_partner", "sync_partner_code", "update_url")
+    internal val PRIVATE_KEYS = setOf("car_code", "sync_code", "sync_serve", "sync_partner", "sync_partner_code", "update_url",
+        "rtl_host", "rtl_port", "car_display", "car_on_wifi")
 
     data class Summary(val encounters: Int, val hidden: Int) {
         override fun toString() = "$encounters history encounters, $hidden hidden devices/names and all settings"

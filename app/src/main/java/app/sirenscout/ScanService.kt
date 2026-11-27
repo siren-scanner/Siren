@@ -81,6 +81,16 @@ class ScanService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_MARK) {
+            // Save the log up to now first, so the moment is complete in History.
+            val loc = if (started) currentLocation() else null
+            scope.launch(Dispatchers.IO) {
+                if (started) runCatching { saveHistory() }
+                Marks.add(this@ScanService, Marks.Mark(System.currentTimeMillis(), loc?.latitude, loc?.longitude))
+            }
+            if (!started) stopSelf()
+            return START_NOT_STICKY
+        }
         if (intent?.action == ACTION_MUTE_TRACKER) {
             intent.getStringExtra(EXTRA_SIGNATURE)?.let { TrackerMutes.mute(this, it) }
             NotificationManagerCompat.from(this).cancel(intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0))
@@ -97,6 +107,7 @@ class ScanService : Service() {
             } else 0,
         )
         prefs = Prefs(this)
+        if (prefs.recordDrives) drive = Traces.Recorder(this)
         Hidden.init(this)
         TrackerMutes.init(this)
         WatchRules.init(this)
@@ -152,6 +163,33 @@ class ScanService : Service() {
                 }
             }
         }
+        // Police vehicles (gear moving together) and Watch this place.
+        scope.launch {
+            while (isActive) {
+                delay(5_000)
+                val now = System.currentTimeMillis()
+                val items = Detections.items.value.values
+                for (g in PoliceCars.update(items, Detections::signal, now)) {
+                    val lead = g.members.maxBy { it.rssi }
+                    notifyFollowing(
+                        lead, "Possible police vehicle", g.label,
+                        "These signals rise and fall together, so they're probably in one vehicle: ${g.label}.",
+                        kind = AlertNotify.Kind.POLICE_CAR,
+                    )
+                }
+                val newHere = PlaceWatch.update(items, now)
+                if (newHere.isNotEmpty() && now - placeWatchNotifiedAt > PLACE_WATCH_NOTIFY_MS) {
+                    placeWatchNotifiedAt = now
+                    val total = PlaceWatch.state.value?.new?.size ?: newHere.size
+                    val d = Detections.items.value[newHere.first().key] ?: items.first()
+                    notifyFollowing(
+                        d, "New device where you're watching", newHere.joinToString(", ") { it.title },
+                        "$total new since Siren learned this place: " + newHere.joinToString(", ") { it.title },
+                        sound = AlertSound.Kind.OTHER, kind = AlertNotify.Kind.PLACE_WATCH,
+                    )
+                }
+            }
+        }
         scope.launch(Dispatchers.IO) {
             while (isActive) {
                 delay(HISTORY_FLUSH_MS)
@@ -163,6 +201,9 @@ class ScanService : Service() {
     }
 
     override fun onDestroy() {
+        runCatching { SdrDriver.stop() }
+        runCatching { drive?.finish() }
+        drive = null
         CarDisplay.stop()
         PhoneSync.stop()
         scope.cancel()
@@ -206,7 +247,7 @@ class ScanService : Service() {
             record?.serviceData.orEmpty().mapNotNull { (k, v) -> DeviceGuesser.uuid16(k)?.let { it to v } }.toMap(),
             record?.serviceUuids.orEmpty().mapNotNull(DeviceGuesser::uuid16).toSet(),
         )
-        sighting(Source.BLE, r.device.address, name, r.rssi, manufacturer.keys.toList(), services, tracker, DeviceGuesser.summary(r)) {
+        sighting(Source.BLE, r.device.address, name, r.rssi, manufacturer.keys.toList(), services, tracker, DeviceGuesser.summary(r), payload = record?.bytes) {
             TeslaKey.guess(name) ?: (if (droneData != null) RemoteId.LABEL else null) ?: DeviceGuesser.ble(r)
         }
     }
@@ -258,7 +299,7 @@ class ScanService : Service() {
                 Intent.ACTION_SCREEN_OFF -> if (AutoTune.screenOffScan(prefs)) startScreenOffScan()
                 Intent.ACTION_SCREEN_ON -> {
                     stopScreenOffScan()
-                    wifiWake.trySend(Unit) // try a fast Wi-Fi scan now that the screen is on
+                    WifiNudge.wake.trySend(Unit) // try a fast Wi-Fi scan now that the screen is on
                 }
             }
         }
@@ -324,8 +365,6 @@ class ScanService : Service() {
     /** When Android last refused a scan; fast scans are retried a while after. */
     private var wifiRefusedAt = -1L
     private var wifiEverySeconds = WIFI_INTERVAL_MS / 1000
-    /** Nudged when the screen comes on, so a fast scan is tried right away instead of after the wait. */
-    private val wifiWake = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
     private fun startWifi() = scope.launch {
         val w = wifi ?: return@launch
@@ -344,11 +383,12 @@ class ScanService : Service() {
                 if (fastStreak > 4) WifiThrottle.detectedOff = true
             } else {
                 fastStreak = 0
-                // With the screen off Android refuses scans whatever the throttling setting, so only a
-                // refusal with the screen on says fast scans aren't allowed on this phone. (Counting the
-                // screen-off ones kept restarting the 10-minute wait, so fast scans never came back.)
+                // Android refuses scans from apps that aren't on screen whatever the throttling setting
+                // (screen off, the lock screen, another app in front), so only a refusal while Siren is
+                // showing says fast scans aren't allowed on this phone. Counting the others started a
+                // 10-minute wait each time the screen came on at the lock screen.
                 val screenOn = getSystemService(android.os.PowerManager::class.java)?.isInteractive != false
-                if (screenOn) {
+                if (screenOn && WifiNudge.sirenOnScreen) {
                     wifiRefusedAt = now
                     if (fast) WifiThrottle.detectedOff = false
                 }
@@ -357,15 +397,35 @@ class ScanService : Service() {
             }
             wifiEverySeconds = (if (fast && requested) FAST_WIFI_INTERVAL_MS else WIFI_INTERVAL_MS) / 1000
             // Android allows 4 scans per 2 minutes for a foreground app unless throttling is off.
-            kotlinx.coroutines.withTimeoutOrNull(wifiEverySeconds * 1000) { wifiWake.receive() }
+            kotlinx.coroutines.withTimeoutOrNull(wifiEverySeconds * 1000) { WifiNudge.wake.receive() }
         }
     }
 
+    /** Fake Wi-Fi addresses flagged recently: why, and when. */
+    private val flaggedTwins = HashMap<String, Pair<String, Long>>()
+
     private fun onWifiResults() {
+        flaggedTwins.values.removeAll { System.currentTimeMillis() - it.second > TWIN_MEMORY_MS }
         val results = runCatching { wifi?.scanResults }.getOrNull() ?: return
         ScanHealth.wifiResults()
         val nowMicros = SystemClock.elapsedRealtime() * 1000
         val fresh = results.filter { nowMicros - it.timestamp < 60_000_000 }
+        // Fake copies of networks (evil twins), judged across the whole scan.
+        val twins = runCatching {
+            @Suppress("DEPRECATION")
+            val conn = wifi?.connectionInfo
+            @Suppress("DEPRECATION")
+            val connected = conn?.ssid?.removeSurrounding("\"")?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }
+                ?.let { s -> conn.bssid?.takeIf { it != "02:00:00:00:00:00" }?.let { s to it } }
+            EvilTwin.find(
+                fresh.mapNotNull { r ->
+                    @Suppress("DEPRECATION")
+                    val s = r.SSID?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }
+                    r.BSSID?.let { EvilTwin.Ap(it, s, EvilTwin.secure(r.capabilities)) }
+                },
+                connected, DeviceGuesser::ouiVendor,
+            )
+        }.getOrDefault(emptyMap())
         for (r in fresh) {
             @Suppress("DEPRECATION")
             val ssid = r.SSID?.takeIf { it.isNotBlank() && it != "<unknown ssid>" }
@@ -382,7 +442,11 @@ class ScanService : Service() {
                     onRemoteId(bssid, r.level) { RemoteId.fromWifiElement(bytes, it) }
                 }
             }
-            sighting(Source.WIFI, bssid, ssid, r.level) {
+            // Once flagged, a fake stays flagged for a while, even on scans that miss the network it copies.
+            val now = System.currentTimeMillis()
+            twins[bssid]?.let { flaggedTwins[bssid] = it to now }
+            val twin = flaggedTwins[bssid]?.takeIf { now - it.second < TWIN_MEMORY_MS }?.first
+            sighting(Source.WIFI, bssid, ssid, r.level, forced = twin?.let { EvilTwin.SIGNATURE to it }) {
                 if (drone) RemoteId.LABEL
                 else DeviceGuesser.wifi(bssid, ssid).let { g -> JokeNames.label(ssid, g) ?: g }
             }
@@ -451,6 +515,15 @@ class ScanService : Service() {
             },
             bands = prefs.bands(),
             bandThresholdDb = prefs.bandThresholdDb,
+            tireSensors = prefs.tireSensors,
+            onTireFrame = ::onTireFrame,
+            // The built-in driver serves a plugged-in dongle on localhost (else the driver app does).
+            // Checked before every connection, so a dongle that dropped out (a loose cable) comes back.
+            beforeConnect = {
+                if (prefs.isLocalSdr && SdrDriver.available && SdrDriver.findDongle(this) != null) SdrDriver.start(this, prefs.rtlPort)
+                else null
+            },
+            handshake = { if (prefs.isLocalSdr && SdrDriver.running) SdrDriver.token else null },
             onBandHit = { band, hit ->
                 // One entry per band: trunked systems hop channels between calls, so per-channel
                 // entries would turn one conversation into a stream of separate alerts.
@@ -466,6 +539,43 @@ class ScanService : Service() {
             },
         )
         scope.launch { monitor.run() }
+    }
+
+    // --- Tire sensors (car following) ---
+
+    /** When this scanning session started: tire sensors heard in its first minutes may be your own car's. */
+    private val sessionStartedAt = System.currentTimeMillis()
+    private val tireWatch by lazy { TireWatch(TireStarts.map(this), sessionStartedAt) }
+
+    /** A tire-sensor message heard on 315 MHz (called from the radio thread). */
+    @Synchronized
+    private fun onTireFrame(frame: Tpms.Frame) {
+        val now = System.currentTimeMillis()
+        val loc = currentLocation()
+        val before = TireStarts.map(this).toMap()
+        val (confirmed, follow) = tireWatch.heard(frame.id, now, loc?.latitude, loc?.longitude, odometer.meters)
+        if (TireStarts.map(this) != before) TireStarts.save(this)
+        val sensor = tireWatch.sensors[frame.id] ?: return
+        if (!sensor.confirmed) return
+        val id = "Tire sensor ${frame.id}"
+        if (Hidden.rules.value.hides(Source.RF, id, null)) return
+        val own = tireWatch.isOwn(frame.id)
+        Detections.record(
+            Source.RF, id, if (own) "Your car's tire sensor" else "Car tire sensor (315 MHz)", frame.levelDb.roundToInt(), null,
+            alertEligible = false, location = loc, guess = "Tire-pressure sensor · 315 MHz", odometerM = odometer.meters,
+        )
+        if (confirmed != null) AppLog.i("Tire sensor heard: ${frame.id}${if (own) " (your car)" else ""}")
+        follow?.let { f ->
+            val d = Detections.items.value["RF|$id"] ?: return@let
+            val miles = formatShortDistance(f.distanceM)
+            notifyFollowing(
+                d, "A car may be following you",
+                "Its tire sensors were with you for ${f.durationMs / 60_000} min over $miles",
+                "The same car's tire-pressure sensors (${f.sensors.joinToString { it.id }}) were heard with you for " +
+                    "${f.durationMs / 60_000} minutes over $miles, at ${f.sensors.maxOf { it.cells.size }} different places. " +
+                    "Cars driving the same road at the same speed can do this too.",
+            )
+        }
     }
 
     // --- Matching and alerts ---
@@ -497,13 +607,19 @@ class ScanService : Service() {
         serviceUuids: List<String> = emptyList(),
         tracker: Signature? = null,
         adSummary: String? = null,
+        /** A finding about this scan as a whole (a fake Wi-Fi copy), which wins over everything else. */
+        forced: Pair<Signature, String>? = null,
+        /** The raw BLE broadcast, for text hidden in it. */
+        payload: ByteArray? = null,
         guess: () -> String?,
     ) {
-        if (isHidden(source, address, name)) return
+        // A fake copy of your network uses your network's name, so hiding that name mustn't hide it;
+        // hiding its address (Hide > this device) still does.
+        if (if (forced != null) Hidden.rules.value.hidesAddress(source, address) else isHidden(source, address, name)) return
         // Your own rules win over built-in signatures, so you can relabel or catch local gear.
-        val (sig, reason) = tracker?.let { it to Trackers.REASONS[it.id] }
+        val (sig, reason) = forced ?: tracker?.let { it to Trackers.REASONS[it.id] }
             ?: WatchRules.match(address, name)
-            ?: Signatures.matchWithReason(source, address, name, manufacturerIds, serviceUuids)
+            ?: Signatures.matchWithReason(source, address, name, manufacturerIds, serviceUuids, payload)
             ?: (null to null)
         val now = System.currentTimeMillis()
         if (VehicleRouters.isRouter(sig)) VehicleRouters.noteSighting(this, address, currentLocation(), now)
@@ -511,7 +627,10 @@ class ScanService : Service() {
             source, address, name, rssi, sig,
             // Trackers pass by constantly in other people's bags; they only alert when they follow you.
             // Vehicle routers are in buses and shops too, so they need backing up (VehicleRouters).
+            // Wi-Fi level 0 means Android gave no reading, not a very strong signal.
             alertEligible = sig != null && sig.category != Category.TRACKER && rssi >= prefs.rssiThreshold &&
+                !Crowds.crowded(sig, Detections.items.value.values, now) &&
+                (source != Source.WIFI || rssi < 0) &&
                 VehicleRouters.mayAlert(
                     this, sig, address, name ?: Detections.items.value["${source.name}|$address"]?.name,
                     Detections.items.value.values, now,
@@ -536,7 +655,9 @@ class ScanService : Service() {
     private fun checkFollowing(source: Source, address: String) {
         if (!prefs.followAlerts) return
         val d = Detections.items.value["${source.name}|$address"] ?: return
-        val follow = followDetector.sighting(d.uid, d.firstSeen, d.lastSeen, odometer.meters) ?: return
+        val follow = followDetector.sighting(
+            d.uid, d.firstSeen, d.lastSeen, odometer.meters, (d.spreadM ?: 0.0) >= WITH_YOU_MIN_SPREAD_M,
+        ) ?: return
         val minutes = follow.durationMs / 60_000
         notifyFollowing(
             d, "Police equipment is traveling with you",
@@ -557,7 +678,9 @@ class ScanService : Service() {
         val d = Detections.items.value["${source.name}|$address"] ?: return
         val sigId = d.signature?.id ?: return
         if (TrackerMutes.isMuted(sigId)) return
-        val follow = trackerDetector.sighting(d.uid, d.firstSeen, d.lastSeen, odometer.meters) ?: return
+        val follow = trackerDetector.sighting(
+            d.uid, d.firstSeen, d.lastSeen, odometer.meters, (d.spreadM ?: 0.0) >= WITH_YOU_MIN_SPREAD_M,
+        ) ?: return
         alertedTrackers += d.uid
         // One alert per tracker type per half hour, however often a device changes its address.
         val now = System.currentTimeMillis()
@@ -641,8 +764,14 @@ class ScanService : Service() {
 
     private val odometer = Odometer()
 
+    /** This session's route, when recording drives is on. */
+    private var drive: Traces.Recorder? = null
+
     private val locationListener = LocationListener { loc ->
-        if (loc.provider == LocationManager.GPS_PROVIDER) odometer.add(loc.latitude, loc.longitude, loc.accuracy)
+        if (loc.provider == LocationManager.GPS_PROVIDER) {
+            odometer.add(loc.latitude, loc.longitude, loc.accuracy, loc.takeIf { it.hasSpeed() }?.speed, loc.time)
+            drive?.add(loc)
+        }
         val prev = lastLocation
         // Prefer a fresh GPS fix, but don't let a coarse network fix replace a recent precise one.
         if (prev == null || loc.time - prev.time > 10_000 || loc.accuracy <= prev.accuracy) lastLocation = loc
@@ -706,7 +835,14 @@ class ScanService : Service() {
         val now = System.currentTimeMillis()
         if (now - lastCameraRefresh > 60_000) {
             lastCameraRefresh = now
-            scope.launch(Dispatchers.IO) { KnownCameras.refreshAround(this@ScanService, loc.latitude, loc.longitude) }
+            // On the highway, also load the area ahead (~20 miles on), so cameras are there before
+            // you are - even if the map servers are slow or there's a dead zone on the way.
+            val ahead = loc.takeIf { it.hasBearing() && it.speed >= LOOKAHEAD_MIN_SPEED_MPS }
+                ?.let { pointAhead(it.latitude, it.longitude, it.bearing, LOOKAHEAD_M) }
+            scope.launch(Dispatchers.IO) {
+                KnownCameras.refreshAround(this@ScanService, loc.latitude, loc.longitude)
+                ahead?.let { (lat, lon) -> KnownCameras.refreshAround(this@ScanService, lat, lon) }
+            }
         }
         // Only alert while moving: "ahead" means nothing without a direction of travel.
         val heading = loc.takeIf { it.hasBearing() && it.speed >= 2.5f }?.bearing ?: return
@@ -867,8 +1003,12 @@ class ScanService : Service() {
             .setContentIntent(DeepLink.intent(this, DeepLink.Device(d.key)))
             .setGroup("siren-" + DeepLink.Device(d.key).encode())
             .setAutoCancel(true)
-        AlertNotify.post(this, AlertNotify.forCategory(sig.category), ALERT_ID, n)
+        AlertNotify.post(
+            this, if (sig.id == EvilTwin.SIGNATURE.id) AlertNotify.Kind.FAKE_WIFI else AlertNotify.forCategory(sig.category), ALERT_ID, n,
+        )
     }
+
+    private var placeWatchNotifiedAt = 0L
 
     private fun ongoingNotification() = NotificationCompat.Builder(this, CH_SERVICE)
         .setSmallIcon(R.drawable.ic_stat_siren)
@@ -876,6 +1016,13 @@ class ScanService : Service() {
         .setContentText("Watching Bluetooth, Wi-Fi and RF for emergency vehicle equipment")
         .setOngoing(true)
         .setContentIntent(openAppIntent())
+        .addAction(
+            0, "Mark this moment",
+            PendingIntent.getService(
+                this, 2, Intent(this, ScanService::class.java).setAction(ACTION_MARK),
+                PendingIntent.FLAG_IMMUTABLE,
+            ),
+        )
         .addAction(
             0, "Stop",
             PendingIntent.getService(
@@ -892,6 +1039,7 @@ class ScanService : Service() {
 
     companion object {
         const val ACTION_STOP = "app.sirenscout.STOP"
+        const val ACTION_MARK = "app.sirenscout.MARK"
         const val ACTION_MUTE_TRACKER = "app.sirenscout.MUTE_TRACKER"
         private const val EXTRA_SIGNATURE = "signature"
         private const val EXTRA_NOTIFICATION_ID = "notification_id"
@@ -900,6 +1048,8 @@ class ScanService : Service() {
         private const val CH_ALERTS = "alerts_v2"
         private const val ONGOING_ID = 1
         private const val ALERT_ID = 2
+        /** At most one "new device where you're watching" notification this often. */
+        private const val PLACE_WATCH_NOTIFY_MS = 10 * 60_000L
         private const val BT_OFF_ID = 6000
         private const val FOLLOW_ID_BASE = 2000
         /** Moved at least this far with a tracker, so one in a neighbor's car parked beside you doesn't count. */
@@ -909,6 +1059,11 @@ class ScanService : Service() {
         private const val AIRCRAFT_POLL_MS = 30_000L
         private val REMOTE_ID_UUID: ParcelUuid = ParcelUuid.fromString(RemoteId.BLE_SERVICE_UUID)
         private const val CAMERA_REALERT_MS = 15 * 60_000L
+        /** Camera downloads look ahead above ~30 mph, this far along the road. */
+        /** How long a fake Wi-Fi flag sticks after the scan that last showed it. */
+        private const val TWIN_MEMORY_MS = 30 * 60_000L
+        private const val LOOKAHEAD_MIN_SPEED_MPS = 13f
+        private const val LOOKAHEAD_M = 30_000.0
         private const val TRACKER_KEEP_SIGHTINGS = 5
         private const val HOTSPOT_REALERT_MS = 30 * 60_000L
         /** Only places with at least this many stops in the period alert; quieter ones are just on the map. */

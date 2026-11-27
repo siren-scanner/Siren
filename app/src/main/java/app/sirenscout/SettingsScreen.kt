@@ -255,6 +255,7 @@ private fun CameraSettings() {
             "Downloads camera locations for your area (rounded to about 10 km) from OpenStreetMap, so it needs a data connection.",
         knownCameras,
     ) { knownCameras = it; prefs.knownCameras = it }
+    CameraReportList()
     if (!knownCameras) return
     SettingRow(
         "Speed and red-light cameras",
@@ -290,6 +291,7 @@ private fun RadioSettings() {
     var threshold by remember { mutableFloatStateOf(prefs.rfThresholdDb) }
     var gain by remember { mutableFloatStateOf(prefs.rfGainTenthsDb / 10f) }
     var band700 by remember { mutableStateOf(prefs.band700) }
+    var tires by remember { mutableStateOf(prefs.tireSensors) }
     var bandNpspac by remember { mutableStateOf(prefs.bandNpspac) }
     var band800 by remember { mutableStateOf(prefs.band800Shared) }
     var bandThreshold by remember { mutableFloatStateOf(prefs.bandThresholdDb) }
@@ -298,7 +300,7 @@ private fun RadioSettings() {
     SettingRow(
         "RF monitoring (RTL-SDR)",
         if (auto) "Turned on by Auto-optimize whenever an RTL-SDR dongle is plugged in (or a remote receiver is set)."
-        else "Needs a USB RTL-SDR dongle and the \"RTL2832U driver\" app, or rtl_tcp on another device.",
+        else "Needs a USB RTL-SDR dongle (Siren drives it itself), or rtl_tcp on another device.",
         checked = if (auto) AutoTune.rfEnabled(context, prefs) else rfEnabled,
         enabled = !auto,
     ) { rfEnabled = it; prefs.rfEnabled = it }
@@ -320,6 +322,16 @@ private fun RadioSettings() {
     BandSwitch("800 MHz shared (806-821 MHz)", "Many county systems, but also utilities and businesses - more false alarms.", band800) {
         band800 = it; prefs.band800Shared = it
     }
+    HorizontalDivider()
+    Text("Tire sensors", style = MaterialTheme.typography.titleSmall)
+    BandSwitch(
+        "Spot a car following you by its tire sensors",
+        "Every car's tires broadcast fixed IDs on 315 MHz. The same car's heard with you for 10+ minutes over 5+ km, at several places, " +
+            "alerts - even an unmarked car. Your own car is learned automatically after two drives.",
+        tires,
+    ) { tires = it; prefs.tireSensors = it }
+    if (prefs.tireStarts.isNotEmpty()) TextButton(onClick = { TireStarts.forget(context) }) { Text("Forget my car's tire sensors") }
+    HorizontalDivider()
     Text("Alert at %.0f dB above a channel's usual level".format(bandThreshold))
     Slider(
         value = bandThreshold, valueRange = 8f..35f,
@@ -662,10 +674,17 @@ private fun AlertNotifySettings() {
 private fun MapTextSetting() {
     val context = LocalContext.current
     var scale by remember { mutableFloatStateOf(Prefs(context).mapTextScale) }
+    Text("Map", style = MaterialTheme.typography.titleSmall)
+    MapStylePicker()
+    Text(
+        "Vector draws street names as text, so they stay sharp at any zoom. OpenStreetMap is the classic map. Both use " +
+            "OpenStreetMap data; heatmap and recorded drives are under Layers on the map.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
     Text("Map text size", style = MaterialTheme.typography.titleSmall)
     Text(
-        "Street names are part of the map pictures, so zooming in doesn't make them bigger - this does. Larger sizes " +
-            "show less of the area at once and look a little softer.",
+        "Makes street and place names bigger. On the OpenStreetMap map the names are part of the map pictures, so " +
+            "larger sizes there show less of the area at once and look a little softer.",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
@@ -936,4 +955,38 @@ private fun PublicUpdateSettings() {
             "get updates automatically.",
         style = MaterialTheme.typography.bodySmall, color = Color.Gray,
     )
+}
+
+/** Spots saved with Report camera on the map, to add to DeFlock / OpenStreetMap. */
+@Composable
+private fun CameraReportList() {
+    val context = LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(Unit) { CameraReports.load(context) }
+    val spots by CameraReports.spots.collectAsStateWithLifecycle()
+    fun open(url: String) = runCatching {
+        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+    }
+    HorizontalDivider()
+    Text("Cameras to report (${spots.size})", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Passed a camera that isn't on the map? Tap Report camera on the map to save the spot, then add it here: DeFlock " +
+            "opens its map at the spot (it shows how to add one), or add it in OpenStreetMap yourself. Once it's in " +
+            "OpenStreetMap, every Siren shows it. Spots stay on this phone.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
+    val fmt = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+    spots.sortedByDescending { it.time }.forEach { s ->
+        Column(Modifier.padding(vertical = 4.dp)) {
+            Text(
+                fmt.format(java.util.Date(s.time)) + (s.heading?.let { " · heading ${compass(it)}" } ?: ""),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text("%.5f, %.5f".format(java.util.Locale.US, s.lat, s.lon), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = { open(CameraReports.deflockUrl(s)) }) { Text("DeFlock") }
+                TextButton(onClick = { open(CameraReports.osmEditUrl(s)) }) { Text("OpenStreetMap") }
+                TextButton(onClick = { CameraReports.remove(context, s) }) { Text("Done") }
+            }
+        }
+    }
 }

@@ -27,8 +27,11 @@ Builds:
       # Google libraries are only used by the maintainer's own (non-foss) editions.
       - sed -i -e '/play-services-location/d' -e '/genai-prompt/d' build.gradle.kts
       - rm -rf src/google
+      # Include the vector map's engine in the app; other builds download it on request.
+      - echo 'siren.bundleVectorMap=true' >> ../gradle.properties
     gradle:
       - foss
+    ndk: r28
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

@@ -24,6 +24,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private const val HOW_TO_JOIN =
@@ -71,10 +73,10 @@ fun SearchTogetherDialog(d: Detection, onDismiss: () -> Unit) {
 
 /** Join a search someone else started, with their code. */
 @Composable
-fun JoinSearchDialog(onDismiss: () -> Unit) {
+fun JoinSearchDialog(initialCode: String = "", onDismiss: () -> Unit) {
     val context = LocalContext.current
     var name by remember { mutableStateOf(Prefs(context).searchName) }
-    var code by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf(initialCode) }
     var error by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -107,6 +109,18 @@ private fun SessionDetails(s: SearchTogether.Session) {
     val estimate by SearchTogether.estimate.collectAsStateWithLifecycle()
     Text("Code", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
     Text(SearchTogether.pretty(s.code), fontFamily = FontFamily.Monospace, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+    val qr = remember(s.code) { qrBitmap(SearchTogether.joinLink(s.code)) }
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Image(
+            bitmap = qr.asImageBitmap(), contentDescription = "QR code to join this search",
+            modifier = Modifier.size(200.dp),
+            filterQuality = androidx.compose.ui.graphics.FilterQuality.None,
+        )
+    }
+    Text(
+        "Others can scan this with their phone's camera to join (Siren must be installed), or type the code.",
+        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+    )
     Text(
         "Looking for: " + (s.target?.label ?: "waiting to hear from the others…"),
         style = MaterialTheme.typography.bodyMedium,
@@ -147,4 +161,14 @@ fun SearchCard(modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+/** A black-on-white QR code for [text], one pixel per module plus a quiet zone (scaled up when drawn). */
+internal fun qrBitmap(text: String): android.graphics.Bitmap {
+    val m = com.google.zxing.qrcode.QRCodeWriter().encode(
+        text, com.google.zxing.BarcodeFormat.QR_CODE, 0, 0, mapOf(com.google.zxing.EncodeHintType.MARGIN to 2),
+    )
+    val bmp = android.graphics.Bitmap.createBitmap(m.width, m.height, android.graphics.Bitmap.Config.ARGB_8888)
+    for (y in 0 until m.height) for (x in 0 until m.width) bmp.setPixel(x, y, if (m[x, y]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
+    return bmp
 }

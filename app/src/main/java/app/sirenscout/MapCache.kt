@@ -29,7 +29,27 @@ object MapCache {
         }
     }
 
-    fun sizeBytes(context: Context): Long = dir(context).walkTopDown().filter { it.isFile }.sumOf { it.length() }
+    fun sizeBytes(context: Context): Long =
+        dir(context).walkTopDown().filter { it.isFile }.sumOf { it.length() } + vectorFiles(context).sumOf { it.length() }
+
+    /** The vector map's own tile database (MapLibre's "ambient cache"). */
+    private fun vectorFiles(context: Context) =
+        listOf(context.filesDir, context.cacheDir).flatMap { d -> d.listFiles { f -> f.name.startsWith("mbgl-offline.db") }.orEmpty().toList() }
+
+    /** MapLibre's file source is used from the main thread. */
+    private fun onMain(context: Context, block: (org.maplibre.android.offline.OfflineManager) -> Unit) =
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            runCatching {
+                if (!VectorLib.prepare(context)) return@post // no vector map, so no vector cache
+                org.maplibre.android.MapLibre.getInstance(context)
+                block(org.maplibre.android.offline.OfflineManager.getInstance(context))
+            }.onFailure { AppLog.w("Vector map cache: ${it.message}") }
+        }
+
+    private val quiet = object : org.maplibre.android.offline.OfflineManager.FileSourceCallback {
+        override fun onSuccess() {}
+        override fun onError(message: String) { AppLog.w("Vector map cache: $message") }
+    }
 
     /** Applies a new cap now, trimming the oldest tiles if the cache is bigger. */
     fun setLimit(context: Context, mb: Int) {
@@ -37,6 +57,7 @@ object MapCache {
         configure(context)
         runCatching { SqlTileWriter().apply { runCleanupOperation(); onDetach() } }
         compact(context)
+        onMain(context) { it.setMaximumAmbientCacheSize(mb * 1_000_000L, quiet) }
     }
 
     /** SQLite keeps a file's size after deleting rows; this gives the space back. */
@@ -54,5 +75,6 @@ object MapCache {
         configure(context)
         runCatching { SqlTileWriter().apply { purgeCache(); onDetach() } }
         compact(context)
+        onMain(context) { it.clearAmbientCache(quiet) }
     }
 }

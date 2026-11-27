@@ -31,6 +31,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.draggable
+import android.content.Intent
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -87,6 +90,7 @@ fun Category?.color() = when (this) {
     Category.RADIO -> Color(0xFFAB47BC)
     Category.SURVEILLANCE -> Color(0xFF26A69A)
     Category.TRACKER -> Color(0xFFEC407A)
+    Category.PRIVACY -> Color(0xFF8D6E63)
     null -> Color(0xFF616161)
 }
 
@@ -105,6 +109,10 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
         var showSettings by rememberSaveable { mutableStateOf(false) }
         var sourceFilter by rememberSaveable { mutableStateOf<Source?>(null) }
         var showMap by rememberSaveable { mutableStateOf(false) }
+        val appContext = LocalContext.current
+        /** Map + list: the map's share of the space, and the pin picked on the map (list follows). */
+        var split by remember { mutableStateOf(Prefs(appContext).mapSplit) }
+        var pinned by remember { mutableStateOf<String?>(null) }
         /** The map on its own page, over everything else. */
         var mapFull by rememberSaveable { mutableStateOf(false) }
         val ctx = LocalContext.current
@@ -200,7 +208,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                 MapFocus.pending.value = MapFocus.Request("flight|$title", lat, lon, title)
             },
         )
-        val matches = visible.filter { it.signature != null }.sortedByDescending { it.lastSeen }
+        val matches = visible.filter { Crowds.isMatch(it, visible, now) }.sortedByDescending { it.lastSeen }
         // Trackers are everywhere in other people's things; they alert only when they follow you.
         val active = matches.filter {
             it.signature?.category != Category.TRACKER && now - it.lastSeen < Detections.ACTIVE_WINDOW_MS &&
@@ -211,7 +219,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             Tab.ALL -> visible.sortedWith(
                 compareByDescending<Detection> { it.signature != null }.thenByDescending { it.rssi }
             )
-            Tab.WITH_ME -> visible.filter { it.withYou != null }.sortedByDescending { it.withYou!!.first }
+            Tab.WITH_ME -> visible.mapNotNull { d -> d.withYou?.let { d to it.first } }.sortedByDescending { it.second }.map { it.first }
             Tab.HISTORY -> history.filterNot(hidden::hides)
             Tab.AIR -> emptyList()
         }
@@ -230,6 +238,9 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             )
         }
         hideTarget?.let { d -> HideDialog(d, onDismiss = { hideTarget = null }) }
+        // A scanned Search together QR code: the join screen, with the code filled in.
+        val scannedJoin by SearchTogether.pendingJoin.collectAsStateWithLifecycle()
+        scannedJoin?.let { code -> JoinSearchDialog(initialCode = SearchTogether.pretty(code)) { SearchTogether.pendingJoin.value = null } }
         if (showSettings) SettingsScreen(onClose = { showSettings = false })
         watchTarget?.let { d -> WatchRuleDialog(d, onDismiss = { watchTarget = null }) }
 
@@ -302,8 +313,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
             )
         }
 
-        val tabRow: @Composable () -> Unit = {
-            Column {
+        val tabChips: @Composable () -> Unit = {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -314,13 +324,15 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                     FilterChip(selected = tab == Tab.AIR, onClick = { tab = Tab.AIR }, label = { Text("Air (${air.size})") })
                     FilterChip(selected = tab == Tab.HISTORY, onClick = { tab = Tab.HISTORY }, label = { Text("History (${history.count { !hidden.hides(it) }})") })
                 }
+        }
+        val tabInfo: @Composable () -> Unit = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (tab == Tab.AIR) "${air.size} drones / police aircraft · tap for details"
                         else "${shown.size} shown" + (if (everydayHidden > 0) " · $everydayHidden everyday hidden" else "") + " · tap for details, hold to hide",
                         style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { showMap = !showMap }) { Text(if (showMap) "List" else "Map") }
+                    if (!showMap) TextButton(onClick = { showMap = true }) { Text("Map") } // map view has List at the top
                     if (tab == Tab.HISTORY) {
                         TextButton(
                             onClick = { chooseExport = true },
@@ -331,6 +343,16 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                         if (tab == Tab.HISTORY) confirmClearHistory = true else Detections.clear()
                     }) { Text(if (tab == Tab.HISTORY) "Delete" else "Clear") }
                 }
+        }
+        val tabRow: @Composable () -> Unit = { Column { tabChips(); tabInfo() } }
+        /** Map view's top: one slim row, so the map and list get the screen. */
+        val slimHeader: @Composable () -> Unit = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = { showMap = false }) { Text("List") }
+                TextButton(onClick = { showMap = false; showSettings = true }) { Text("Settings") }
+                if (status.running) Button(onClick = onStop, colors = ButtonDefaults.buttonColors(containerColor = AlertRed)) { Text("Stop") }
+                else Button(onClick = onStart) { Text("Start") }
             }
         }
         val sourceRow: @Composable () -> Unit = {
@@ -366,7 +388,7 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                         DetectionMap(
                             shown, Modifier.fillMaxSize().systemBarsPadding(), air = onMap,
                             onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it },
-                            fullScreen = true, onFullScreen = { mapFull = false },
+                            fullScreen = true, onFullScreen = { mapFull = false }, alerts = active,
                         )
                     }
                 }
@@ -383,35 +405,72 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                     if (maxWidth > maxHeight) {
                         // Sideways there's no height to stack controls above the map: put them beside it.
                         Row(Modifier.fillMaxSize().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(
-                                Modifier.weight(0.42f).fillMaxHeight().verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            SplitList(
+                                shown, now, pinned, Modifier.weight(0.42f).fillMaxHeight(),
+                                onDetails = { detailTarget = it }, onHide = { hideTarget = it }, headerRows = 4,
                             ) {
-                                Header(status, onStart, onStop, onToggleSettings = { showSettings = !showSettings })
-                                AlertBanner(active, status.running)
-                                tabRow()
-                                sourceRow()
-                                missingFix()
+                                item { slimHeader() }
+                                item { tabRow() }
+                                item { sourceRow() }
+                                item { missingFix() }
                             }
-                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it }, onFullScreen = { mapFull = true })
+                            DetectionMap(shown, Modifier.weight(0.58f).fillMaxHeight(), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it }, onFullScreen = { mapFull = true }, onPinSelected = { pinned = it }, alerts = active)
                         }
                     } else {
                         Column(
-                            modifier = Modifier.fillMaxSize().padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            // No room for settings above the map; show them in the list view instead.
-                            Header(status, onStart, onStop, onToggleSettings = { showSettings = true })
-                            AlertBanner(active, status.running)
-                            tabRow()
-                            sourceRow()
-                            missingFix()
-                            DetectionMap(shown, Modifier.fillMaxWidth().weight(1f), air = onMap, onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it }, onFullScreen = { mapFull = true })
+                            // One slim row on top; the status lines and banner stay in the list view (alerts show on the map).
+                            slimHeader()
+                            tabChips()
+                            // Map on top, list below, with a handle between them to share the space.
+                            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                                val total = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+                                Column(Modifier.fillMaxSize()) {
+                                    if (split > 0.02f) DetectionMap(
+                                        shown, Modifier.fillMaxWidth().weight(split.coerceAtLeast(0.001f)), air = onMap,
+                                        onAirDetails = { airTarget = it }, onDetails = { detailTarget = it }, onHide = { hideTarget = it },
+                                        onFullScreen = { mapFull = true }, onPinSelected = { pinned = it }, alerts = active,
+                                    )
+                                    SplitHandle(
+                                        onDrag = { dy -> split = (split + dy / total).coerceIn(0f, 1f) },
+                                        onDone = {
+                                            // Close to an edge: all list or all map.
+                                            split = when { split < 0.12f -> 0f; split > 0.9f -> 1f; else -> split }
+                                            Prefs(appContext).mapSplit = split
+                                        },
+                                    )
+                                    if (split < 0.98f) SplitList(
+                                        shown, now, pinned, Modifier.fillMaxWidth().weight((1f - split).coerceAtLeast(0.001f)),
+                                        onDetails = { detailTarget = it }, onHide = { hideTarget = it },
+                                        headerRows = if (split <= 0.02f) 4 else 3,
+                                    ) {
+                                        // Map dragged shut: its alert bar is gone, so the banner shows here instead.
+                                        if (split <= 0.02f) item { AlertBanner(active, status.running) }
+                                        // The filters scroll away with the list.
+                                        item { tabInfo() }
+                                        item { sourceRow() }
+                                        item { missingFix() }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             } else {
+                val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+                val markAt by Marks.selected.collectAsStateWithLifecycle()
+                // Opening a mark scrolls the log to that moment (5 rows sit above the list).
+                LaunchedEffect(markAt, tab) {
+                    val m = markAt ?: return@LaunchedEffect
+                    if (tab != Tab.HISTORY) return@LaunchedEffect
+                    val i = shown.indexOfFirst { Marks.around(it, m.time) }.takeIf { it >= 0 }
+                        ?: shown.indexOfFirst { it.lastSeen < m.time }.takeIf { it >= 0 } ?: return@LaunchedEffect
+                    listState.animateScrollToItem(5 + i)
+                }
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.padding(padding).fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -440,7 +499,16 @@ fun SirenScoutApp(onStart: () -> Unit, onStop: () -> Unit) {
                         }
                     } else {
                         item { sourceRow() }
-                        items(shown, key = { it.uid }) { DetectionRow(it, now, onClick = { detailTarget = it }, onLongClick = { hideTarget = it }) }
+                        item { if (tab == Tab.HISTORY) MarksRow(shown) }
+                        items(shown, key = { it.uid }) { d ->
+                            val m = markAt
+                            if (tab == Tab.HISTORY && m != null && Marks.around(d, m.time)) {
+                                // Around at the marked moment: outlined.
+                                Box(Modifier.border(2.dp, Color(0xFFFFB300), androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).padding(2.dp)) {
+                                    DetectionRow(d, now, onClick = { detailTarget = d }, onLongClick = { hideTarget = d })
+                                }
+                            } else DetectionRow(d, now, onClick = { detailTarget = d }, onLongClick = { hideTarget = d })
+                        }
                     }
                 }
             }
@@ -517,6 +585,17 @@ private fun Header(status: ScanStatus, onStart: () -> Unit, onStop: () -> Unit, 
             Text("Bluetooth: ${status.classic}", style = style)
             Text("Wi-Fi: ${status.wifi}", style = style)
             Text("RF: ${status.rf}", style = style)
+            val watching by PlaceWatch.state.collectAsStateWithLifecycle()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val ctx = LocalContext.current
+                TextButton(onClick = {
+                    ctx.startService(Intent(ctx, ScanService::class.java).setAction(ScanService.ACTION_MARK))
+                    android.widget.Toast.makeText(ctx, "Moment marked - find it in History", android.widget.Toast.LENGTH_SHORT).show()
+                }, contentPadding = PaddingValues(0.dp)) { Text("Mark this moment") }
+                // Side by side while not watching; the watch card needs the full width.
+                if (watching == null) { Spacer(Modifier.width(24.dp)); PlaceWatchSection() }
+            }
+            if (watching != null) PlaceWatchSection()
         }
     }
 }
@@ -524,6 +603,7 @@ private fun Header(status: ScanStatus, onStart: () -> Unit, onStop: () -> Unit, 
 @Composable
 private fun AlertBanner(active: List<Detection>, running: Boolean) {
     val strongest = active.maxByOrNull { it.rssi }
+    val cars by PoliceCars.groups.collectAsStateWithLifecycle()
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (strongest != null) AlertRed else MaterialTheme.colorScheme.surfaceVariant
@@ -543,6 +623,7 @@ private fun AlertBanner(active: List<Detection>, running: Boolean) {
                 )
                 val where = if (strongest.source == Source.RF) strongest.id else "${strongest.rssi} dBm, ${away(distanceText(strongest))}"
                 Text("${strongest.signature?.label} - $where", color = Color.White)
+                for (car in cars) Text("Possible police vehicle: ${car.label}", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1283,4 +1364,151 @@ internal fun LocationColorSetting() {
         }
     }
     HorizontalDivider()
+}
+
+/** Watch this place: a button to start, then what's new, gone or back since Siren learned the spot. */
+@Composable
+private fun PlaceWatchSection() {
+    val state by PlaceWatch.state.collectAsStateWithLifecycle()
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(state != null) { while (state != null) { kotlinx.coroutines.delay(1_000); now = System.currentTimeMillis() } }
+    var open by remember { mutableStateOf(false) }
+    val s = state
+    if (s == null) {
+        TextButton(onClick = { PlaceWatch.start() }, contentPadding = PaddingValues(0.dp)) { Text("Watch this place…") }
+        return
+    }
+    val gone = s.gone(now)
+    Card(Modifier.fillMaxWidth().clickable { open = true }) {
+        Column(Modifier.padding(12.dp)) {
+            Text("Watching this place", fontWeight = FontWeight.Bold)
+            if (now - s.startedAt < PlaceWatch.LEARN_MS) {
+                val left = s.learningLeftMs(now) / 1000
+                Text("Learning what's normally here: ${s.baseline.size} devices · ${left / 60}:%02d left".format(left % 60), style = MaterialTheme.typography.bodySmall)
+            } else {
+                Text(
+                    "${s.new.size} new · ${gone.size} gone · ${s.back.size} back (${s.baseline.size} learned) · tap for the list",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (s.new.isNotEmpty()) Color(0xFFFFB300) else Color.Unspecified,
+                )
+            }
+        }
+    }
+    if (open) AlertDialog(
+        onDismissRequest = { open = false },
+        title = { Text("Watching this place") },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                item { Text("Since ${java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(s.startedAt)}. Leave the phone here; anything that shows up after the first 5 minutes is new.", style = MaterialTheme.typography.bodySmall) }
+                item { Text("New (${s.new.size})", fontWeight = FontWeight.Bold) }
+                items(s.new.values.sortedByDescending { it.firstSeen }) { n ->
+                    Text("${n.title} · ${n.source.label} · first ${ago(now, n.firstSeen)}, last ${ago(now, n.lastSeen)}", style = MaterialTheme.typography.bodySmall)
+                }
+                item { Text("Back after leaving (${s.back.size})", fontWeight = FontWeight.Bold) }
+                items(s.back.keys.mapNotNull { s.baseline[it] }) { b ->
+                    Text("${b.title} · ${b.source.label} · back ${ago(now, s.back.getValue(b.fingerprint))}", style = MaterialTheme.typography.bodySmall)
+                }
+                item { Text("Gone (${gone.size})", fontWeight = FontWeight.Bold) }
+                items(gone) { g -> Text("${g.title} · ${g.source.label} · last ${ago(now, g.lastSeen)}", style = MaterialTheme.typography.bodySmall) }
+            }
+        },
+        confirmButton = { TextButton(onClick = { open = false }) { Text("Close") } },
+        dismissButton = { TextButton(onClick = { PlaceWatch.stop(); open = false }) { Text("Stop watching") } },
+    )
+}
+
+/** Marked moments, newest first: tap one to open the log at that moment. */
+@Composable
+private fun MarksRow(shown: List<Detection>) {
+    val context = LocalContext.current
+    val marks by Marks.marks.collectAsStateWithLifecycle()
+    val selected by Marks.selected.collectAsStateWithLifecycle()
+    if (marks.isEmpty()) {
+        Text("Tip: Mark this moment (under the scan status, or on Siren's notification) saves the time and place, to open this log there later.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+        return
+    }
+    val fmt = remember { java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Marked moments", style = MaterialTheme.typography.titleSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            for (m in marks) FilterChip(
+                selected = selected == m,
+                onClick = { Marks.selected.value = if (selected == m) null else m },
+                label = { Text(fmt.format(m.time)) },
+            )
+        }
+        selected?.let { m ->
+            val count = shown.count { Marks.around(it, m.time) }
+            Text(
+                "${fmt.format(m.time)}: $count device${if (count == 1) "" else "s"} around then, outlined below" +
+                    (m.lat?.let { " · %.4f, %.4f".format(java.util.Locale.US, it, m.lon) } ?: ""),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row {
+                TextButton(onClick = { Marks.selected.value = null }) { Text("Close") }
+                TextButton(onClick = { Marks.remove(context, m) }) { Text("Delete mark") }
+            }
+        }
+    }
+}
+
+/** The bar between the map and the list: drag it to give one more room. */
+@Composable
+private fun SplitHandle(onDrag: (Float) -> Unit, onDone: () -> Unit) {
+    val state = androidx.compose.foundation.gestures.rememberDraggableState { onDrag(it) }
+    Box(
+        Modifier.fillMaxWidth().height(22.dp)
+            .draggable(state, androidx.compose.foundation.gestures.Orientation.Vertical, onDragStopped = { onDone() }),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.width(48.dp).height(5.dp).background(Color(0xFF9E9E9E), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)))
+    }
+}
+
+/**
+ * The device list beside or under the map. Tapping a device shows it on the map or opens its
+ * details (the toggle above the list); a pin picked on the map scrolls the list to it, outlined.
+ */
+@Composable
+private fun SplitList(
+    shown: List<Detection>,
+    now: Long,
+    pinned: String?,
+    modifier: Modifier,
+    onDetails: (Detection) -> Unit,
+    onHide: (Detection) -> Unit,
+    /** How many items [top] adds above the list, to scroll to the right row. */
+    headerRows: Int = 0,
+    top: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
+) {
+    val context = LocalContext.current
+    var toMap by remember { mutableStateOf(Prefs(context).splitTapShowsOnMap) }
+    val state = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(pinned) {
+        val i = shown.indexOfFirst { it.uid == pinned }
+        if (i >= 0) state.animateScrollToItem(headerRows + 1 + i)
+    }
+    LazyColumn(modifier, state = state, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        top()
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Tap a device:", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                FilterChip(selected = toMap, onClick = { toMap = true; Prefs(context).splitTapShowsOnMap = true }, label = { Text("Show on map") })
+                FilterChip(selected = !toMap, onClick = { toMap = false; Prefs(context).splitTapShowsOnMap = false }, label = { Text("Open details") })
+            }
+        }
+        items(shown, key = { it.uid }) { d ->
+            val onClick = {
+                if (toMap && d.lat != null) {
+                    val est = Detections.estimate(d)
+                    if (est != null) MapFocus.request(d, est.lat, est.lon) else MapFocus.request(d)
+                } else onDetails(d)
+            }
+            if (d.uid == pinned) {
+                Box(Modifier.border(2.dp, Color(0xFF00B8D4), androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).padding(2.dp)) {
+                    DetectionRow(d, now, onClick = onClick, onLongClick = { onHide(d) })
+                }
+            } else DetectionRow(d, now, onClick = onClick, onLongClick = { onHide(d) })
+        }
+    }
 }

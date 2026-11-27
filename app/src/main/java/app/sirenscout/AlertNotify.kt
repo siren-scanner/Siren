@@ -15,6 +15,10 @@ object AlertNotify {
         TRACKER("Unknown tracker traveling with you"),
         RADIO("Public-safety radio transmitting"),
         SURVEILLANCE("Flock, Raven and other surveillance sensors nearby"),
+        FAKE_WIFI("Possible fake Wi-Fi (evil twin)"),
+        PRIVACY("Camera glasses and card skimmers"),
+        POLICE_CAR("Possible police vehicle"),
+        PLACE_WATCH("New devices where you're watching"),
         PLATE_READER("Mapped plate reader ahead"),
         SPEED_CAMERA("Speed or red-light camera ahead"),
         HOTSPOT("Traffic-stop hotspot ahead"),
@@ -29,6 +33,7 @@ object AlertNotify {
         Category.RADIO -> Kind.RADIO
         Category.TRACKER -> Kind.TRACKER
         Category.SURVEILLANCE -> Kind.SURVEILLANCE
+        Category.PRIVACY -> Kind.PRIVACY
         Category.FIRE_EMS, Category.FLEET -> Kind.OTHER
     }
 

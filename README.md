@@ -18,7 +18,7 @@ feature or report a problem* in the app.
 |---|---|---|
 | Bluetooth LE | continuous scan | Axon body cameras and Axon Signal, Motorola/WatchGuard cameras, APX radios, Whelen / Federal Signal / Code 3 light-bar controllers, LIFEPAK / ZOLL / Stryker EMS gear, Flock and Raven units, AirTags, Tiles, SmartTags and Google Find Hub tags away from their owner |
 | Classic Bluetooth | discovery every 30 s | the same device names |
-| Wi-Fi | scan every 31 s (Android's limit) | Cradlepoint, Sierra Wireless AirLink, Peplink and Inseego vehicle routers |
+| Wi-Fi | scan every 31 s (Android's limit) | Cradlepoint, Sierra Wireless AirLink, Peplink and Inseego vehicle routers; fake copies of Wi-Fi networks ("evil twins") |
 | Drones (beta) | Bluetooth / Wi-Fi Remote ID | any drone broadcasting FAA Remote ID: serial, position, height, operator position |
 | Police call data (online) | cities' and states' open data | traffic-stop hotspots from past police calls (New Orleans), live police calls (Dallas) and crash hotspots (Utah); [add your city](CONTRIBUTING.md#add-your-citys-police-call-data) |
 | Police aircraft (beta, online) | adsb.lol ADS-B feed | helicopters and planes registered to police, sheriffs, state patrols and federal law enforcement (FAA registry) |

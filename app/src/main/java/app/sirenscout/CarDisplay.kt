@@ -171,7 +171,7 @@ object CarDisplay {
         val status = Detections.status.value
         val hidden = Hidden.rules.value
         val visible = Detections.items.value.values.filterNot(hidden::hides)
-        val matches = visible.filter { it.signature != null }.sortedByDescending { it.lastSeen }
+        val matches = visible.filter { Crowds.isMatch(it, visible, System.currentTimeMillis()) }.sortedByDescending { it.lastSeen }
         val active = matches.filter {
             it.signature?.category != Category.TRACKER && now - it.lastSeen < Detections.ACTIVE_WINDOW_MS
         }

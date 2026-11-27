@@ -1,0 +1,1 @@
+Siren 1.1.0: Search together (phones, hotspot, MeshCore and Meshtastic radios, QR code to join), an optional sharp vector map, history heatmap and recorded drives, Watch this place, possible police vehicle alerts, many more devices recognized (body cams, camera glasses, card skimmers), fake Wi-Fi warnings, Report camera, and fixes.

@@ -71,6 +71,25 @@ object SearchTogether {
     private var lastSlowSend = 0L
     private val random = SecureRandom()
 
+    // --- Joining by QR code ---
+
+    /** What a search's QR code holds: opens Siren's join screen with the code filled in. */
+    fun joinLink(code: String) = "siren://join/$code"
+
+    /** A code from a scanned QR code, waiting for the join screen. */
+    val pendingJoin = MutableStateFlow<String?>(null)
+
+    /** Picks up a scanned join link (siren://join/CODE) from the intent that opened Siren. */
+    fun handleLink(intent: android.content.Intent?) {
+        codeFromLink(intent?.dataString)?.let { pendingJoin.value = it }
+    }
+
+    /** The search code in a join link, or null if it isn't one. */
+    fun codeFromLink(link: String?): String? {
+        val m = Regex("^siren://join/([A-Za-z0-9-]+)$").find(link?.trim() ?: return null) ?: return null
+        return normalize(m.groupValues[1]).takeIf { it.length == CODE_LENGTH }
+    }
+
     // --- Codes and keys ---
 
     private const val ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ" // no 0/O, 1/I

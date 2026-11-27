@@ -68,7 +68,13 @@ class MainActivity : ComponentActivity() {
         AiGuesser.init(this)
         Flights.load(this)
         DeepLink.handle(intent)
+        // A scanned join link only once: not again on rotation, or when reopened from recent apps.
+        val fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (savedInstanceState == null && !fromHistory) SearchTogether.handleLink(intent)
+        if (SearchTogether.codeFromLink(intent.dataString) != null) intent.data = null
         MapText.load(this)
+        MapStyle.load(this)
+        Marks.load(this)
         DemoMode.maybeStart(this, intent)
         FlightWatchService.start(this) // picks up flights tracked before Siren was closed
         // On-device AI is only allowed while the app is on screen, so tie it to the resumed state.
@@ -85,10 +91,13 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         DeepLink.handle(intent)
+        SearchTogether.handleLink(intent)
+        if (SearchTogether.codeFromLink(intent.dataString) != null) intent.data = null
     }
 
     override fun onResume() {
         super.onResume()
+        WifiNudge.shown(true)
         // Something may have been switched off while we were away; put it back while scanning.
         if (Detections.status.value.running && pending == null) ensureRequirements(then = {})
     }
@@ -209,7 +218,17 @@ class MainActivity : ComponentActivity() {
             launchService()
             return
         }
-        // Ask the "RTL2832U driver" app to open the USB dongle and serve rtl_tcp on localhost.
+        // The built-in driver: just needs USB permission for the dongle (asked once; Android remembers
+        // it only while plugged in, unless the user ticks "always").
+        val dongle = SdrDriver.findDongle(this)
+        if (SdrDriver.available && dongle != null) {
+            if (!SdrDriver.hasPermission(this, dongle)) {
+                usbAnswer = { launchService() }
+                SdrDriver.requestPermission(this, dongle)
+            } else launchService()
+            return
+        }
+        // Otherwise the "RTL2832U driver" app opens the USB dongle and serves rtl_tcp on localhost.
         val uri = "iqsrc://-a 127.0.0.1 -p ${prefs.rtlPort} -s ${RtlTcpMonitor.SAMPLE_RATE}"
         try {
             sdrDriverLauncher.launch(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
@@ -217,6 +236,30 @@ class MainActivity : ComponentActivity() {
             launchService()
             Detections.setStatus { it.copy(rf = "install the \"RTL2832U driver\" app to use a USB SDR") }
         }
+    }
+
+    /** What to do once Android answers the USB permission question. */
+    private var usbAnswer: (() -> Unit)? = null
+    private val usbReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent) {
+            usbAnswer?.invoke()
+            usbAnswer = null
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ContextCompat.registerReceiver(this, usbReceiver, android.content.IntentFilter(SdrDriver.ACTION_PERMISSION), ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    override fun onPause() {
+        WifiNudge.shown(false)
+        super.onPause()
+    }
+
+    override fun onStop() {
+        runCatching { unregisterReceiver(usbReceiver) }
+        super.onStop()
     }
 
     private fun launchService() {

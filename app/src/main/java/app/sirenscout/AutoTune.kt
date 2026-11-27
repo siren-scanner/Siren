@@ -24,8 +24,7 @@ object AutoTune {
 
     /** An RTL2832U-based SDR dongle on the USB port. */
     fun sdrConnected(context: Context): Boolean =
-        context.getSystemService(UsbManager::class.java)?.deviceList?.values.orEmpty()
-            .any { it.vendorId == 0x0BDA && it.productId in setOf(0x2832, 0x2838) }
+        SdrDriver.findDongle(context) != null
 
     /** On battery, let the screen sleep and rely on the targeted scan. */
     fun keepScreenOn(context: Context, prefs: Prefs) =
@@ -42,7 +41,7 @@ object AutoTune {
     /** Only when there's something to listen with and something to listen for. */
     fun rfEnabled(context: Context, prefs: Prefs): Boolean {
         if (!prefs.autoOptimize) return prefs.rfEnabled
-        if (prefs.frequenciesHz().isEmpty() && prefs.bands().isEmpty()) return false
+        if (prefs.frequenciesHz().isEmpty() && prefs.bands().isEmpty() && !prefs.tireSensors) return false
         return !prefs.isLocalSdr || sdrConnected(context)
     }
 

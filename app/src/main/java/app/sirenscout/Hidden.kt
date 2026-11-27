@@ -23,7 +23,13 @@ object Hidden {
             "${source.name}|$id" in devices || (name != null && name in names) ||
                 prefixes.any { id.startsWith(it, ignoreCase = true) }
 
-        fun hides(d: Detection) = hides(d.source, d.id, d.name)
+        /** By address or address prefix only, not by name. */
+        fun hidesAddress(source: Source, id: String) =
+            "${source.name}|$id" in devices || prefixes.any { id.startsWith(it, ignoreCase = true) }
+
+        /** A fake Wi-Fi copy uses a real network's name, so hiding that name doesn't hide it; hiding its address does. */
+        fun hides(d: Detection) =
+            if (d.signature?.id == EvilTwin.SIGNATURE.id) hidesAddress(d.source, d.id) else hides(d.source, d.id, d.name)
     }
 
     private val _rules = MutableStateFlow(Rules())

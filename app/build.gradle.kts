@@ -7,15 +7,27 @@ plugins {
 }
 
 android {
+    // The vector map's engine is an optional download (VectorLib), except in the F-Droid build,
+    // which sets siren.bundleVectorMap=true: F-Droid doesn't allow apps to download code.
+    // siren.emulator=true: a test build for the (Intel) Android emulator, engine included.
+    val emulatorBuild = providers.gradleProperty("siren.emulator").orNull == "true"
+    val bundleVectorMap = emulatorBuild || providers.gradleProperty("siren.bundleVectorMap").orNull == "true"
+    ndkVersion = "28.0.13004108"
+    externalNativeBuild { ndkBuild { path = file("src/main/jni/Android.mk") } }
+    packaging { jniLibs { if (!bundleVectorMap) excludes += "**/libmaplibre.so" else useLegacyPackaging = true } }
     namespace = "app.sirenscout"
     compileSdk = 35
 
     defaultConfig {
         applicationId = "app.sirenscout"
         minSdk = 26
+        // The vector map's native code: only the chips Android phones use, to keep the app small.
+        // ndk-build for the built-in RTL-SDR driver (libusb + librtlsdr, app/src/main/jni).
+        externalNativeBuild { ndkBuild { arguments += listOf("-j8") } }
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") + (if (emulatorBuild) listOf("x86_64") else emptyList()) }
         targetSdk = 35
-        versionCode = 92
-        versionName = "1.0.90"
+        versionCode = 110
+        versionName = "1.1.8"
     }
 
     // Private settings for the maintainer's own builds, kept out of the shared code: the self-update
@@ -67,6 +79,7 @@ android {
         buildConfigField("String", "AUTHOR", "\"$author\"")
         // The open-source edition only talks to open services (no hexdb.io lookups).
         buildConfigField("boolean", "PUBLIC_EDITION", "false")
+        buildConfigField("boolean", "VECTOR_BUNDLED", bundleVectorMap.toString())
     }
     productFlavors {
         create("stable") {
@@ -136,6 +149,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+    // The vector map (BSD-2-Clause, no Google services), drawing OpenFreeMap's OpenStreetMap tiles.
+    implementation("org.maplibre.gl:android-sdk:13.8.0")
+    // QR codes for joining a search (Apache-2.0, pure Java, no Google services).
+    implementation("com.google.zxing:core:3.5.3")
     // Google libraries: only in Siren and Siren Test, never in the open-source (foss) edition.
     "stableImplementation"("com.google.android.gms:play-services-location:21.3.0")
     "betaImplementation"("com.google.android.gms:play-services-location:21.3.0")

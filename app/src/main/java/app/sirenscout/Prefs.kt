@@ -12,6 +12,16 @@ class Prefs(context: Context) {
         get() = sp.getInt("rssi_threshold", -90)
         set(v) = sp.edit().putInt("rssi_threshold", v).apply()
 
+    /** Listen for cars' tire-pressure sensors (315 MHz) with the SDR, to spot a car following you. */
+    var tireSensors: Boolean
+        get() = sp.getBoolean("tire_sensors", true)
+        set(v) = sp.edit().putBoolean("tire_sensors", v).apply()
+
+    /** Tire sensors heard at the start of scanning sessions: "id:sessions", for learning your own car. */
+    var tireStarts: Map<String, Int>
+        get() = sp.getStringSet("tire_starts", emptySet())!!.mapNotNull { e -> e.split(':').takeIf { it.size == 2 }?.let { it[0] to (it[1].toIntOrNull() ?: 0) } }.toMap()
+        set(v) = sp.edit().putStringSet("tire_starts", v.entries.sortedByDescending { it.value }.take(64).map { "${it.key}:${it.value}" }.toSet()).apply()
+
     var rfEnabled: Boolean
         get() = sp.getBoolean("rf_enabled", false)
         set(v) = sp.edit().putBoolean("rf_enabled", v).apply()
@@ -71,6 +81,36 @@ class Prefs(context: Context) {
     var routersAlone: Boolean
         get() = sp.getBoolean("routers_alone", false)
         set(v) = sp.edit().putBoolean("routers_alone", v).apply()
+
+    /** Upright with the map open: how much of the space below the tabs the map takes (the list gets the rest). */
+    var mapSplit: Float
+        get() = sp.getFloat("map_split", 0.55f)
+        set(v) = sp.edit().putFloat("map_split", v).apply()
+
+    /** In the map + list view, tapping a device shows it on the map (true) or opens its details. */
+    var splitTapShowsOnMap: Boolean
+        get() = sp.getBoolean("split_tap_map", true)
+        set(v) = sp.edit().putBoolean("split_tap_map", v).apply()
+
+    /** Keep the route of each scanning session (on the phone only) to look at again on the map. */
+    var recordDrives: Boolean
+        get() = sp.getBoolean("record_drives", true)
+        set(v) = sp.edit().putBoolean("record_drives", v).apply()
+
+    /** "vector" (sharp text, MapLibre + OpenFreeMap) or "osm" (classic OpenStreetMap tiles). */
+    var mapStyle: String
+        get() = sp.getString("map_style", "osm") ?: "osm"
+        set(v) = sp.edit().putString("map_style", v).apply()
+
+    /** Set while the vector map starts; still set at the next launch means it crashed starting. */
+    var vectorStarting: Boolean
+        get() = sp.getBoolean("vector_starting", false)
+        set(v) = sp.edit().putBoolean("vector_starting", v).commit().let { }
+
+    /** History heatmap on the map: how far back, in days (0 = off, -1 = everything). */
+    var heatmapDays: Int
+        get() = sp.getInt("heatmap_days", 0)
+        set(v) = sp.edit().putInt("heatmap_days", v).apply()
 
     /** Map turns so the direction of travel points up while following (off: always north up). */
     var mapHeadingUp: Boolean

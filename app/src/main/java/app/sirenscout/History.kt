@@ -66,6 +66,14 @@ object History {
 
     fun load(context: Context, limit: Int = 5000): List<Detection> = query(context, null, null, limit)
 
+    /** Flagged encounters (with a signature) that overlapped [from]..[to]. */
+    fun flaggedBetween(context: Context, from: Long, to: Long, limit: Int = 2000): List<Detection> =
+        query(context, "signature_id IS NOT NULL AND first_seen <= ? AND last_seen >= ?", arrayOf(to.toString(), from.toString()), limit)
+
+    /** Flagged encounters with a place, last seen since [since], for the history heatmap. */
+    fun flaggedSince(context: Context, since: Long, limit: Int = 20_000): List<Detection> =
+        query(context, "signature_id IS NOT NULL AND lat IS NOT NULL AND last_seen >= ?", arrayOf(since.toString()), limit)
+
     /** Every saved encounter with this device (same radio and address), newest first. */
     fun encountersOf(context: Context, source: Source, id: String, limit: Int = 200): List<Detection> =
         query(context, "source = ? AND device_id = ?", arrayOf(source.name, id), limit)

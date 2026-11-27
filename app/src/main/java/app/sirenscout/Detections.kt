@@ -31,6 +31,18 @@ data class Detection(
     val adSummary: String? = null,
     /** Saved location estimate (history rows); live detections use [Detections.estimate]. */
     val estimate: LocationEstimate? = null,
+    /**
+     * How far apart the places were where this encounter was heard, in metres (see
+     * [Detections.spreadM]); null when unknown, as for saved history.
+     */
+    val spreadM: Double? = null,
+    /**
+     * The encounter this continues when the device switched to a new random Bluetooth address
+     * (see [Detections.record]); keeps [uid] stable so following and history carry on.
+     */
+    val encounter: String? = null,
+    /** Earlier addresses of this encounter, newest first. */
+    val previousIds: List<String> = emptyList(),
 ) {
     /**
      * Time and distance this device has stayed with you, once that's long enough to mean
@@ -40,7 +52,9 @@ data class Detection(
         get() {
             val distance = (lastOdometerM ?: return null) - (startOdometerM ?: return null)
             val duration = lastSeen - firstSeen
-            return (duration to distance).takeIf { duration >= WITH_YOU_MIN_MS && distance >= WITH_YOU_MIN_M }
+            return (duration to distance).takeIf {
+                duration >= WITH_YOU_MIN_MS && distance >= WITH_YOU_MIN_M && (spreadM == null || spreadM >= WITH_YOU_MIN_SPREAD_M)
+            }
         }
 
     /** Shown in lists: the signature, the broadcast name, or failing those a marked guess. */
@@ -56,7 +70,10 @@ data class Detection(
     val isDrone get() = guess == RemoteId.LABEL
 
     /** Identified from what it broadcasts rather than guessed: no (UNK), and the AI isn't asked. */
-    val isIdentified get() = isTesla || isDrone || isJokeName
+    val isIdentified get() = isTesla || isDrone || isJokeName || isTireSensor
+
+    /** A car's tire-pressure sensor, known from what it broadcasts on 315 MHz. */
+    val isTireSensor get() = source == Source.RF && id.startsWith("Tire sensor ")
 
     /** A home router with a prank law-enforcement name ("FBI Surveillance Van"). */
     val isJokeName get() = guess?.startsWith(JokeNames.LABEL) == true
@@ -65,11 +82,13 @@ data class Detection(
 
     val key get() = "${source.name}|$id"
     /** Identifies this encounter; the same device seen again after a gap gets a new one. */
-    val uid get() = "$key|$firstSeen"
+    val uid get() = encounter ?: "$key|$firstSeen"
 }
 
 private const val WITH_YOU_MIN_MS = 5 * 60_000L
 private const val WITH_YOU_MIN_M = 500.0
+/** ...and heard at places at least this far apart (a fixed router is only heard within ~100 m). */
+const val WITH_YOU_MIN_SPREAD_M = 300.0
 
 /** "2 h 10 min · 34 mi" */
 fun formatWithYou(withYou: Pair<Long, Double>): String {
@@ -123,11 +142,19 @@ object Detections {
     private val estimates = HashMap<String, Pair<Int, LocationEstimate?>>()
     private const val MAX_READINGS = 300
 
-    private fun addReading(key: String, location: Location, rssi: Int, now: Long) {
-        SearchTogether.onLocalReading(key, location.latitude, location.longitude, rssi, now)
+    private fun addReading(key: String, location: Location, rssi: Int, now: Long) =
+        addReading(key, location.latitude, location.longitude, rssi, now)
+
+    /** A signal reading at a place; [record] adds them, tests add them directly. */
+    @Synchronized
+    internal fun addReading(key: String, lat: Double, lon: Double, rssi: Int, now: Long) {
+        SearchTogether.onLocalReading(key, lat, lon, rssi, now)
+        // Everywhere this encounter was heard: kept apart from the readings, which get trimmed.
+        val b = bounds.getOrPut(key) { doubleArrayOf(lat, lon, lat, lon) }
+        b[0] = minOf(b[0], lat); b[1] = minOf(b[1], lon); b[2] = maxOf(b[2], lat); b[3] = maxOf(b[3], lon)
         val list = readings.getOrPut(key) { ArrayDeque() }
         val last = list.lastOrNull()
-        val r = Reading(location.latitude, location.longitude, rssi.toDouble(), now)
+        val r = Reading(lat, lon, rssi.toDouble(), now)
         // Readings from the same spot a moment apart are averaged rather than piled up.
         if (last != null && now - last.time < 5_000 &&
             Odometer.distanceM(last.lat, last.lon, r.lat, r.lon) < 3.0
@@ -138,6 +165,19 @@ object Detections {
             while (list.size > MAX_READINGS) list.removeFirst()
         }
     }
+
+    /**
+     * How far apart the places were where this encounter was heard (the diagonal of their
+     * bounding box), in metres: something really traveling with you is heard along the way.
+     */
+    @Synchronized
+    fun spreadM(key: String): Double {
+        val b = bounds[key] ?: return 0.0
+        return Odometer.distanceM(b[0], b[1], b[2], b[3])
+    }
+
+    /** Per encounter: min lat, min lon, max lat, max lon of every reading. */
+    private val bounds = HashMap<String, DoubleArray>()
 
     /**
      * Where a stationary device probably is, from this encounter's readings; null when there
@@ -186,10 +226,25 @@ object Detections {
         now: Long = System.currentTimeMillis(),
     ): Detection? {
         val key = "${source.name}|$id"
-        val existing = _items.value[key]
+        // A device that just switched to a new random address carries on as the same encounter.
+        val linked = if (_items.value[key] == null) rotatedFrom(source, key, name, rssi, adSummary, now) else null
+        if (linked != null) {
+            _items.value = _items.value - linked.key
+            readings.remove(linked.key)?.let { readings[key] = it }
+            bounds.remove(linked.key)?.let { bounds[key] = it }
+            estimates.remove(linked.key)?.let { estimates[key] = it }
+            signals.remove(linked.key)?.let { signals[key] = it }
+            if (finding.value == linked.key) finding.value = key
+        }
+        val existing = _items.value[key] ?: linked
         val alert = alertEligible && (existing == null || now - existing.lastAlert > REALERT_MS)
         val prev = existing?.takeIf { now - it.lastSeen < ENCOUNTER_GAP_MS }
-        val strongest = prev == null || rssi >= prev.bestRssi
+        // Wi-Fi level 0 means Android gave no reading: never the strongest, and not a reading to locate by.
+        val hasReading = source != Source.WIFI || rssi < 0
+        // A new encounter starts its readings afresh; the old place no longer applies.
+        if (prev == null) { readings.remove(key); estimates.remove(key); bounds.remove(key) }
+        if (location != null && hasReading) addReading(key, location, rssi, now)
+        val strongest = prev == null || (hasReading && (prev.bestRssi >= 0 || rssi >= prev.bestRssi))
         val moveMarker = location != null && (strongest || prev?.lat == null)
         val next = Detection(
             source = source,
@@ -209,17 +264,39 @@ object Detections {
             startOdometerM = prev?.startOdometerM ?: odometerM,
             lastOdometerM = odometerM ?: prev?.lastOdometerM,
             adSummary = adSummary ?: prev?.adSummary,
+            spreadM = spreadM(key),
+            encounter = linked?.uid ?: prev?.encounter,
+            previousIds = linked?.let { listOf(it.id) + it.previousIds }?.take(MAX_PREVIOUS_IDS) ?: prev?.previousIds.orEmpty(),
         )
         _items.value = _items.value + (key to next)
-        // A new encounter starts its readings afresh; the old place no longer applies.
-        if (prev == null) { readings.remove(key); estimates.remove(key) }
-        if (location != null) addReading(key, location, rssi, now)
         signals.getOrPut(key) { ArrayDeque() }.apply {
             addLast(Sample(now, rssi))
             while (isNotEmpty() && now - first().time > SIGNAL_WINDOW_MS) removeFirst()
         }
         return next.takeIf { alert }
     }
+
+    /**
+     * The device a new Bluetooth address most likely belongs to: phones, earbuds and trackers
+     * switch random addresses every few minutes. Linked only when exactly one device with the same
+     * name and broadcast fingerprint went quiet 1.5-30 s ago, at a similar signal, and none like it
+     * is still being heard (after RF Sentinel's rotation linking). Several look-alikes (a room of
+     * iPhones) are never guessed between.
+     */
+    private fun rotatedFrom(source: Source, key: String, name: String?, rssi: Int, adSummary: String?, now: Long): Detection? {
+        if (source != Source.BLE || adSummary == null) return null
+        val alike = _items.value.values.filter {
+            it.source == Source.BLE && it.key != key && it.adSummary == adSummary && it.name == name
+        }
+        if (alike.any { now - it.lastSeen < LINK_MIN_QUIET_MS }) return null
+        val quiet = alike.filter { now - it.lastSeen <= LINK_MAX_QUIET_MS }
+        return quiet.singleOrNull()?.takeIf { kotlin.math.abs(it.rssi - rssi) <= LINK_MAX_RSSI_JUMP }
+    }
+
+    private const val LINK_MIN_QUIET_MS = 1_500L
+    private const val LINK_MAX_QUIET_MS = 30_000L
+    private const val LINK_MAX_RSSI_JUMP = 15
+    private const val MAX_PREVIOUS_IDS = 10
 
     @Synchronized
     fun prune(now: Long = System.currentTimeMillis()) {
@@ -229,6 +306,7 @@ object Detections {
         signals.keys.retainAll(_items.value.keys)
         readings.keys.retainAll(_items.value.keys)
         estimates.keys.retainAll(_items.value.keys)
+        bounds.keys.retainAll(_items.value.keys)
     }
 
     @Synchronized
@@ -238,6 +316,7 @@ object Detections {
 
     @Synchronized
     fun clear() {
+        bounds.clear()
         _items.value = emptyMap()
         signals.clear()
         readings.clear()

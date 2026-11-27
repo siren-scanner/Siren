@@ -90,4 +90,17 @@ class KnownCamerasTest {
         assertEquals("facing toward you - checks traffic coming your way", facingText(speed, 0f))
         assertEquals("at the lights ahead", facingText(speed.copy(kind = CameraKind.RED_LIGHT, views = emptyList()), 0f))
     }
+
+    @Test
+    fun `point ahead along a heading`() {
+        val (lat, lon) = pointAhead(40.0, -100.0, 0f, 30_000.0)      // due north, 30 km
+        assertEquals(40.2698, lat, 0.001); assertEquals(-100.0, lon, 0.0001)
+        val (lat2, lon2) = pointAhead(40.0, -100.0, 270f, 30_000.0)  // due west
+        assertEquals(40.0, lat2, 0.01); assertEquals(-100.352, lon2, 0.002)
+    }
+
+    @Test
+    fun `camera download retries back off`() {
+        assertEquals(listOf(2L, 5L, 10L, 30L), KnownCameras.RETRY_DELAYS_MS.map { it / 60_000 })
+    }
 }

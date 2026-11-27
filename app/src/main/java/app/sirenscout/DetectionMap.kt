@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.padding
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -71,13 +74,76 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Street level: individual buildings and parking spaces. */
-private const val FOCUS_ZOOM = 19.0
+internal const val FOCUS_ZOOM = 19.0
 
 /** A few miles across: room for an aircraft or drone to move without leaving the screen. */
-private const val AIR_FOCUS_ZOOM = 12.0
+internal const val AIR_FOCUS_ZOOM = 12.0
+
+/** What the shared map controls need from whichever map is drawing (OpenStreetMap tiles or vector). */
+interface MapEngine {
+    val lastFix: Location?
+    /** The heading from the last minute, if moving. */
+    fun lastFreshBearing(): Float?
+    val isFollowing: Boolean
+    fun follow(on: Boolean)
+    /** Which way (clockwise from north) is up on the map now. */
+    fun bearing(): Float
+
+    /** Turns the map so [deg] (clockwise from north) points up; 0 is north up. */
+    fun setBearing(deg: Float)
+    fun moveTo(lat: Double, lon: Double, zoom: Double, animate: Boolean = false)
+    fun fit(points: List<GeoPoint>)
+    fun center(): GeoPoint?
+    /** Location permission just granted. */
+    fun startLocation()
+    fun saveState()
+    /** Runs [block] once the map has laid out and drawn the latest pins. */
+    fun afterLayout(block: () -> Unit)
+    /** A pin for something not in the device list, with a label. */
+    fun showTempPin(lat: Double, lon: Double, title: String)
+    /** Centres on an aircraft or drone and shows its label; false if it isn't on the map. */
+    fun focusAir(key: String): Boolean
+}
+
+/** Map state shared by the controls and both kinds of map. */
+class MapUi(headingUp: Boolean) {
+    private val turnState = mutableStateOf(if (headingUp) MapTurn.HEADING else MapTurn.NORTH)
+    val turn: MapTurn get() = turnState.value
+    /** Read by location callbacks off the main thread, which can't read Compose state. */
+    val turnNow = java.util.concurrent.atomic.AtomicReference(turnState.value)
+    fun setTurn(t: MapTurn) { turnState.value = t; turnNow.set(t) }
+    /** The pin whose card is showing, by detection uid. */
+    val selected = mutableStateOf<String?>(null)
+    var following by mutableStateOf(MapState.following)
+    var center by mutableStateOf<GeoPoint?>(null)
+    var zoom by mutableStateOf(15.0)
+    /** A tapped camera, hotspot, teammate or aircraft (vector map; the classic map uses bubbles). */
+    var info by mutableStateOf<MapInfo?>(null)
+}
+
+data class MapInfo(val title: String, val text: String, val source: String? = null, val onOpen: (() -> Unit)? = null)
+
+/** Everything drawn on top of the base map. */
+data class MapLayers(
+    val located: List<Detection>,
+    val selected: String?,
+    val cameras: List<Camera>?,
+    val hotspots: Map<String, List<PoliceData.Hotspot>>?,
+    val live: Map<String, List<PoliceData.LiveCall>>?,
+    val together: SearchTogether.Session?,
+    val teammates: Map<Int, SearchTogether.Peer>,
+    val teamEstimate: LocationEstimate?,
+    val air: List<AirContact>,
+    val heat: List<GeoPoint>,
+    val drive: Traces.Shown?,
+    /** What's alerting right now (the list's red banner), shown as a bar on the map. */
+    val alerts: List<Detection> = emptyList(),
+)
 
 /**
- * OpenStreetMap view with one pin per detection, placed where its signal was strongest. Tapping a
+ * The map: one pin per detection, at its estimated location or where its signal was strongest,
+ * with known cameras, police data, searchers, aircraft, the history heatmap and a recorded drive.
+ * Drawn as a sharp vector map or with classic OpenStreetMap tiles (Settings or Layers). Tapping a
  * pin shows a card with [onDetails] and [onHide], as tapping and holding a row does in the list.
  */
 @Composable
@@ -91,41 +157,114 @@ fun DetectionMap(
     /** Shown in a page of its own: the button then leaves full screen instead of entering it. */
     fullScreen: Boolean = false,
     onFullScreen: (() -> Unit)? = null,
+    /** The pin you picked (its uid), or null: lets a list beside the map follow along. */
+    onPinSelected: (String?) -> Unit = {},
+    /** What's alerting right now, for the red bar on the map. */
+    alerts: List<Detection> = emptyList(),
 ) {
     val context = LocalContext.current
-    /** How the map turns: with your heading, never (north up), or wherever you turned it by hand. */
-    var turn by remember { mutableStateOf(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH) }
-    /** "Search a place": the dialog, and the place the map was sent to (with its summary card). */
-    var searching by remember { mutableStateOf(false) }
-    var joining by remember { mutableStateOf(false) }
+    val ui = remember { MapUi(Prefs(context).mapHeadingUp) }
+    LaunchedEffect(ui.selected.value) { onPinSelected(ui.selected.value) }
+    val style by MapStyle.current.collectAsStateWithLifecycle()
     val together by SearchTogether.session.collectAsStateWithLifecycle()
     val teammates by SearchTogether.peers.collectAsStateWithLifecycle()
     val teamEstimate by SearchTogether.estimate.collectAsStateWithLifecycle()
-    val teamLayer = remember { TeamLayer() }
-    var searched by remember { mutableStateOf(MapState.searched) }
-    // The location overlay reads this off the main thread, so it can't read Compose state.
-    val turnNow = remember { java.util.concurrent.atomic.AtomicReference(turn) }
-    fun setTurn(t: MapTurn) { turn = t; turnNow.set(t) }
-    val markers = remember { mutableMapOf<String, Marker>() }
-    /** The pin whose card is showing, by detection uid. */
-    val selectedState = remember { mutableStateOf<String?>(null) }
-    var selected by selectedState
-    /** Translucent uncertainty circles for estimated locations, by detection uid. */
-    val circles = remember { mutableMapOf<String, Polygon>() }
-    var following by remember { mutableStateOf(MapState.following) }
-    var center by remember { mutableStateOf<GeoPoint?>(null) }
-    var zoom by remember { mutableStateOf(15) }
     val showCameras = remember { Prefs(context).knownCameras }
     val cameras by KnownCameras.cameras.collectAsStateWithLifecycle()
     val speedCameras = remember { Prefs(context).speedCameras }
     val wantedCameras = remember(cameras) { cameras.wanted(speedCameras) }
-    val cameraLayer = remember { CameraLayer() }
     val showPolice = remember { Prefs(context).policeData }
     val hotspots by PoliceData.hotspots.collectAsStateWithLifecycle()
     val liveCalls by PoliceData.live.collectAsStateWithLifecycle()
-    val policeLayer = remember { PoliceLayer() }
-    val airLayer = remember { AirLayer() }
-    airLayer.onDetails = onAirDetails
+    val drive by Traces.shown.collectAsStateWithLifecycle()
+    val heatDays by MapStyle.heatmapDays.collectAsStateWithLifecycle()
+    var heat by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
+    LaunchedEffect(heatDays) {
+        heat = emptyList()
+        if (heatDays == 0) return@LaunchedEffect
+        while (true) {
+            val since = if (heatDays < 0) 0L else System.currentTimeMillis() - heatDays * 86_400_000L
+            heat = withContext(Dispatchers.IO) {
+                runCatching { History.flaggedSince(context, since) }.getOrDefault(emptyList()).mapNotNull { d ->
+                    d.estimate?.let { GeoPoint(it.lat, it.lon) } ?: d.lat?.let { GeoPoint(it, d.lon!!) }
+                }
+            }
+            delay(5 * 60_000L) // new encounters are saved every few minutes
+        }
+    }
+    val layers = MapLayers(
+        located = detections.filter { it.lat != null && it.lon != null },
+        selected = ui.selected.value,
+        cameras = wantedCameras.takeIf { showCameras },
+        hotspots = hotspots.takeIf { showPolice },
+        live = liveCalls.takeIf { showPolice },
+        together = together, teammates = teammates, teamEstimate = teamEstimate,
+        air = air, heat = heat, drive = drive, alerts = alerts,
+    )
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.clipToBounds()) {
+        // A short map (sharing the screen with the list) gets slimmer cards and scrolling buttons.
+        val compact = maxHeight < 380.dp
+        val buttonsMax = maxHeight
+        // A new map when the style changes; both pick up where the other left off (MapState).
+        val engine = key(style) {
+            if (style == MapStyle.VECTOR && VectorLib.available(context)) VectorMap(ui, layers, onAirDetails) else OsmMap(ui, layers, onAirDetails)
+        }
+        MapChrome(engine, ui, layers, onDetails, onHide, fullScreen, onFullScreen, showCameras, showPolice, wantedCameras, hotspots, liveCalls, compact, buttonsMax)
+    }
+}
+
+/** Which map draws, and the heatmap period; changed from the Layers dialog or Settings. */
+object MapStyle {
+    const val VECTOR = "vector"
+    const val OSM = "osm"
+    val current = kotlinx.coroutines.flow.MutableStateFlow(OSM)
+    /** The vector map crashed while starting last time, so the classic map is back. */
+    val fellBack = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val heatmapDays = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val HEATMAP_CHOICES = listOf(0 to "Off", 1 to "Last 24 hours", 7 to "Last 7 days", 30 to "Last 30 days", -1 to "Everything")
+
+    fun load(context: android.content.Context) {
+        val p = Prefs(context)
+        if (p.vectorStarting) {
+            p.vectorStarting = false
+            p.mapStyle = OSM
+            fellBack.value = true
+            AppLog.w("The vector map didn't finish starting last time; back to the OpenStreetMap map")
+        }
+        // The vector map needs its engine (an optional download); without it, the classic map.
+        current.value = if (p.mapStyle == VECTOR && !VectorLib.available(context)) OSM else p.mapStyle
+        heatmapDays.value = p.heatmapDays
+    }
+
+    fun set(context: android.content.Context, style: String) { Prefs(context).mapStyle = style; current.value = style; fellBack.value = false }
+    fun setHeatmap(context: android.content.Context, days: Int) { Prefs(context).heatmapDays = days; heatmapDays.value = days }
+}
+
+/** The buttons, cards and dialogs over either map. */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.MapChrome(
+    engine: MapEngine,
+    ui: MapUi,
+    layers: MapLayers,
+    onDetails: (Detection) -> Unit,
+    onHide: (Detection) -> Unit,
+    fullScreen: Boolean,
+    onFullScreen: (() -> Unit)?,
+    showCameras: Boolean,
+    showPolice: Boolean,
+    cameras: List<Camera>,
+    hotspots: Map<String, List<PoliceData.Hotspot>>,
+    liveCalls: Map<String, List<PoliceData.LiveCall>>,
+    compact: Boolean = false,
+    height: androidx.compose.ui.unit.Dp = androidx.compose.ui.unit.Dp.Infinity,
+) {
+    val context = LocalContext.current
+    var searching by remember { mutableStateOf(false) }
+    var joining by remember { mutableStateOf(false) }
+    var layersOpen by remember { mutableStateOf(false) }
+    var searched by remember { mutableStateOf(MapState.searched) }
+    val together = layers.together
+    val located = layers.located
     var hasLocation by remember {
         mutableStateOf(
             // Demo data (debug builds, for screenshots) never shows the real location, nor asks for it.
@@ -133,6 +272,376 @@ fun DetectionMap(
                 PackageManager.PERMISSION_GRANTED
         )
     }
+    fun where() = ui.center ?: engine.center()
+
+    if (showCameras) {
+        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { KnownCameras.ensureLoaded(context) } }
+        // Load cameras around wherever the map is. Polled rather than keyed on the center, which
+        // changes with every GPS fix while following; already-covered areas return immediately.
+        LaunchedEffect(engine) {
+            while (true) {
+                delay(3_000)
+                val c = where() ?: continue
+                // 0,0 is the map's default before any fix - open ocean, nothing to download.
+                if (abs(c.latitude) < 1 && abs(c.longitude) < 1) continue
+                withContext(Dispatchers.IO) { KnownCameras.refreshAround(context, c.latitude, c.longitude) }
+            }
+        }
+    }
+    if (showPolice) {
+        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { PoliceData.ensureLoaded(context) } }
+        // Like the cameras: download a city's police data when the map is looking at it.
+        LaunchedEffect(engine) {
+            val live = Prefs(context).liveCalls
+            while (true) {
+                delay(10_000)
+                val c = where() ?: continue
+                if (abs(c.latitude) < 1 && abs(c.longitude) < 1) continue
+                withContext(Dispatchers.IO) { PoliceData.refreshAround(context, c.latitude, c.longitude, live) }
+            }
+        }
+    }
+
+    // "Show on map": stop following, zoom to street level on the spot, and open its pin.
+    val focus by MapFocus.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(focus, engine) {
+        val f = focus ?: return@LaunchedEffect
+        engine.follow(false)
+        ui.following = false
+        engine.afterLayout {
+            engine.setBearing(0f)
+            ui.info = null
+            // Aircraft move fast: zoom out to a few miles around where it is now, not street level.
+            if (engine.focusAir(f.uid)) return@afterLayout
+            engine.moveTo(f.lat, f.lon, FOCUS_ZOOM)
+            if (located.any { it.uid == f.uid }) ui.selected.value = f.uid
+            else engine.showTempPin(f.lat, f.lon, f.title) // not in the current list (e.g. filtered out)
+        }
+        MapFocus.pending.value = null
+    }
+
+    // The map's turn, for the compass rose (polled: the two map engines report it differently).
+    var bearing by remember { mutableStateOf(0f) }
+    LaunchedEffect(engine) { while (true) { bearing = engine.bearing(); delay(200) } }
+    val alerts = layers.alerts
+    // Alerts on the map itself: a red bar across the top, which flashes when something new shows up.
+    val barHeight = if (alerts.isNotEmpty()) 52.dp else 0.dp
+    if (alerts.isNotEmpty()) AlertBar(alerts, Modifier.align(Alignment.TopCenter).padding(horizontal = 8.dp, vertical = 6.dp)) { d ->
+        val est = Detections.estimate(d)
+        if (est != null) MapFocus.request(d, est.lat, est.lon) else MapFocus.request(d)
+    }
+    val gap = Arrangement.spacedBy(8.dp)
+    Column(
+        Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 8.dp + barHeight)
+            // On a short map the buttons scroll rather than run off the bottom.
+            .then(if (height != androidx.compose.ui.unit.Dp.Infinity) Modifier.heightIn(max = height - 16.dp - barHeight) else Modifier)
+            .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+        verticalArrangement = gap,
+    ) {
+        MapIconButton("Search a place", onClick = { searching = true }, icon = MapIcons.search)
+        if (located.isNotEmpty()) MapIconButton("Show all on the map", onClick = {
+            engine.follow(false)
+            ui.following = false
+            engine.setBearing(0f)
+            if (ui.turn == MapTurn.FREE) ui.setTurn(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH)
+            val points = located.map { d -> Detections.estimate(d)?.let { GeoPoint(it.lat, it.lon) } ?: GeoPoint(d.lat!!, d.lon!!) }
+            engine.fit(points)
+        }, icon = MapIcons.showAll)
+        if (hasLocation) MapIconButton("Report camera here", onClick = {
+            // Passed a camera that isn't on the map? Save the spot now, add it to DeFlock later.
+            val fix = engine.lastFix
+            if (fix == null) {
+                android.widget.Toast.makeText(context, "No location yet - try again in a moment", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                CameraReports.add(
+                    context,
+                    CameraReports.Spot(System.currentTimeMillis(), fix.latitude, fix.longitude, fix.takeIf { it.hasBearing() }?.bearing),
+                )
+                android.widget.Toast.makeText(context, "Camera spot saved - add it later from Settings > Cameras", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }, icon = MapIcons.camera)
+        if (together == null) MapIconButton("Join a search", onClick = { joining = true }, icon = MapIcons.people)
+    }
+    Column(
+        Modifier.align(Alignment.TopEnd).padding(end = 8.dp, top = 8.dp + barHeight),
+        verticalArrangement = gap,
+    ) {
+        // Compass rose: north up <-> heading up; a hand-turned map goes back to north first.
+        MapIconButton(
+            when (ui.turn) { MapTurn.HEADING -> "Heading up - tap for north up"; MapTurn.NORTH -> "North up - tap for heading up"; MapTurn.FREE -> "Turned by hand - tap for north up" },
+            onClick = {
+                val next = if (ui.turn == MapTurn.NORTH) MapTurn.HEADING else MapTurn.NORTH
+                ui.setTurn(next)
+                Prefs(context).mapHeadingUp = next == MapTurn.HEADING
+                if (next == MapTurn.NORTH) engine.setBearing(0f)
+                else engine.lastFreshBearing()?.let { if (engine.isFollowing) engine.setBearing(it) }
+                engine.saveState()
+            },
+            active = ui.turn == MapTurn.HEADING,
+            icon = if (ui.turn == MapTurn.HEADING) MapIcons.heading else MapIcons.compass(bearing),
+        )
+        MapIconButton("Map layers", onClick = { layersOpen = true }, icon = MapIcons.layers)
+        onFullScreen?.let { open -> MapIconButton(if (fullScreen) "Leave full screen" else "Full screen", onClick = open, icon = MapIcons.fullScreen(fullScreen)) }
+    }
+    if (!hasLocation) {
+        // Android 12+ ignores a request for precise location that doesn't also ask for approximate.
+        val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+            hasLocation = granted
+            if (granted) {
+                engine.startLocation()
+                ui.following = true
+            }
+        }
+        Card(Modifier.align(Alignment.Center).padding(24.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Location is off for Siren", style = MaterialTheme.typography.titleMedium)
+                Text("The map needs it to show where you are and the plate readers around you.")
+                Button(onClick = {
+                    permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                }) { Text("Allow location") }
+            }
+        }
+    }
+    val chosen = ui.selected.value?.let { uid -> located.firstOrNull { it.uid == uid } }
+    val info = ui.info
+    when {
+        chosen != null && compact -> SlimPinCard(
+            chosen,
+            onDetails = { onDetails(chosen) },
+            onClose = { ui.selected.value = null },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(6.dp),
+        )
+        chosen != null -> PinCard(
+            chosen,
+            onDetails = { onDetails(chosen) },
+            onHide = { ui.selected.value = null; onHide(chosen) },
+            onClose = { ui.selected.value = null },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
+        )
+        info != null -> InfoCard(info, onClose = { ui.info = null }, modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
+        together != null -> SearchCard(Modifier.align(Alignment.BottomStart).padding(8.dp).fillMaxWidth(0.72f))
+        searched != null -> PlaceCard(
+            searched!!, cameras, hotspots, liveCalls,
+            onClose = { searched = null; MapState.searched = null },
+            modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).fillMaxWidth(0.72f),
+        )
+        layers.drive != null -> DriveCard(layers.drive, Modifier.align(Alignment.BottomStart).padding(8.dp).fillMaxWidth(0.72f))
+    }
+    if (joining) JoinSearchDialog { joining = false }
+    if (layersOpen) LayersDialog(onDismiss = { layersOpen = false }, onShowDrive = { shown ->
+        layersOpen = false
+        engine.follow(false)
+        ui.following = false
+        engine.setBearing(0f)
+        engine.fit(shown.points.map { GeoPoint(it.lat, it.lon) })
+    })
+    if (searching) PlaceSearchDialog(
+        onDismiss = { searching = false },
+        onPick = { place ->
+            searching = false
+            engine.follow(false)
+            ui.following = false
+            engine.setBearing(0f)
+            if (ui.turn == MapTurn.FREE) ui.setTurn(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH)
+            engine.moveTo(place.lat, place.lon, 12.0)
+            ui.center = GeoPoint(place.lat, place.lon)
+            engine.saveState()
+            searched = place
+            MapState.searched = place
+        },
+    )
+    if (hasLocation && chosen == null && info == null) {
+        // Locate me (filled while following).
+        MapIconButton(
+            if (ui.following) "Following you" else "Follow me",
+            onClick = {
+                engine.follow(true)
+                ui.following = true
+                // Following again: back to your chosen mode rather than the hand-turned angle.
+                val mode = if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH
+                ui.setTurn(mode)
+                if (mode == MapTurn.NORTH) engine.setBearing(0f)
+            },
+            active = ui.following,
+            icon = MapIcons.locate(ui.following),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+        )
+    }
+}
+
+/** A tapped camera, hotspot, aircraft or teammate. */
+@Composable
+private fun InfoCard(info: MapInfo, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    Card(modifier.fillMaxWidth()) {
+        Column(Modifier.padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 4.dp)) {
+            Text(info.title, style = MaterialTheme.typography.titleMedium)
+            if (info.text.isNotBlank()) Text(info.text, style = MaterialTheme.typography.bodySmall)
+            info.source?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                info.onOpen?.let { open -> TextButton(onClick = { onClose(); open() }) { Text("Details") } }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onClose) { Text("Close") }
+            }
+        }
+    }
+}
+
+/** The recorded drive on the map: when, how far, and the flagged equipment seen along it. */
+@Composable
+private fun DriveCard(shown: Traces.Shown, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Card(modifier) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Drive · ${time(context, shown.trace.start)}", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = { Traces.shown.value = null }) { Text("Close") }
+            }
+            val minutes = (shown.trace.end - shown.trace.start) / 60_000
+            Text(
+                "${formatShortDistance(Traces.lengthM(shown.points))} · ${minutes / 60} h ${minutes % 60} min · " +
+                    "${shown.flagged.size} flagged along the way",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+/** Map style, history heatmap and recorded drives. */
+@Composable
+private fun LayersDialog(onDismiss: () -> Unit, onShowDrive: (Traces.Shown) -> Unit) {
+    val context = LocalContext.current
+    val style by MapStyle.current.collectAsStateWithLifecycle()
+    val heatDays by MapStyle.heatmapDays.collectAsStateWithLifecycle()
+    val prefs = remember { Prefs(context) }
+    var record by remember { mutableStateOf(prefs.recordDrives) }
+    var drives by remember { mutableStateOf(Traces.list(context)) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Map layers") },
+        text = {
+            androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                item { Text("Map", style = MaterialTheme.typography.titleSmall) }
+                if (MapStyle.fellBack.value) item {
+                    Text("The vector map failed to start last time, so the classic map is back. You can try it again.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFFB300))
+                }
+                item { MapStylePicker() }
+                item { Text("History heatmap", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp)) }
+                item { Text("Where flagged equipment showed up before, from Siren's history.", style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
+                item {
+                    for ((days, label) in MapStyle.HEATMAP_CHOICES) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { MapStyle.setHeatmap(context, days) }) {
+                            androidx.compose.material3.RadioButton(selected = heatDays == days, onClick = { MapStyle.setHeatmap(context, days) })
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+                item { Text("Drives", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp)) }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Record my drives while scanning", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        androidx.compose.material3.Switch(checked = record, onCheckedChange = { record = it; prefs.recordDrives = it })
+                    }
+                }
+                item { Text("Kept on this phone only (the newest 100); starts with the next scan.", style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
+                if (drives.isEmpty()) item { Text("No drives recorded yet.", style = MaterialTheme.typography.bodySmall) }
+                items(drives.size) { i ->
+                    val t = drives[i]
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val minutes = (t.end - t.start) / 60_000
+                        Text(
+                            "${time(context, t.start)} · ${minutes / 60} h ${minutes % 60} min",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f).clickable {
+                                scope.launch {
+                                    withContext(Dispatchers.IO) { Traces.show(context, t) }
+                                    Traces.shown.value?.let(onShowDrive)
+                                }
+                            }.padding(vertical = 6.dp),
+                        )
+                        TextButton(onClick = { Traces.delete(t); drives = Traces.list(context) }) { Text("Delete") }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+/**
+ * Vector or classic map. The vector map's engine is a one-time download (unless the app came with
+ * it), offered right here; it can be removed again.
+ */
+@Composable
+internal fun MapStylePicker() {
+    val context = LocalContext.current
+    val style by MapStyle.current.collectAsStateWithLifecycle()
+    val lib by VectorLib.state.collectAsStateWithLifecycle()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val have = remember(lib) { VectorLib.available(context) }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable(enabled = have) { MapStyle.set(context, MapStyle.VECTOR) }) {
+            androidx.compose.material3.RadioButton(selected = style == MapStyle.VECTOR, enabled = have, onClick = { MapStyle.set(context, MapStyle.VECTOR) })
+            Text("Vector - sharp street names at any zoom", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (!have) {
+            val abi = VectorLib.abi()
+            when {
+                abi == null -> Text("Not available for this phone's processor.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                lib is VectorLib.State.Downloading -> {
+                    val d = lib as VectorLib.State.Downloading
+                    Text(
+                        "Downloading… " + (if (d.total > 0) "${d.done * 100 / d.total}%" else "${d.done / 1_000_000} MB"),
+                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 48.dp),
+                    )
+                }
+                else -> Column(Modifier.padding(start = 48.dp)) {
+                    Text(
+                        "Needs a one-time download of the map engine (about 4 MB), kept separate so the app stays small.",
+                        style = MaterialTheme.typography.bodySmall, color = Color.Gray,
+                    )
+                    (lib as? VectorLib.State.Failed)?.let { Text("Download failed: ${it.message}", style = MaterialTheme.typography.bodySmall, color = Color(0xFFFFB300)) }
+                    TextButton(
+                        onClick = {
+                            scope.launch {
+                                val ok = withContext(Dispatchers.IO) { runCatching { VectorLib.download(context) }.isSuccess }
+                                if (ok) MapStyle.set(context, MapStyle.VECTOR)
+                            }
+                        },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                    ) { Text("Download vector map") }
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { MapStyle.set(context, MapStyle.OSM) }) {
+            androidx.compose.material3.RadioButton(selected = style == MapStyle.OSM, onClick = { MapStyle.set(context, MapStyle.OSM) })
+            Text("OpenStreetMap - the classic map", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (have && !BuildConfig.VECTOR_BUNDLED) TextButton(
+            onClick = { MapStyle.set(context, MapStyle.OSM); VectorLib.remove(context) },
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        ) { Text("Remove the vector map (${VectorLib.sizeBytes(context) / 1_000_000} MB)") }
+    }
+}
+
+/** Classic OpenStreetMap tiles (osmdroid). */
+@Composable
+private fun OsmMap(ui: MapUi, layers: MapLayers, onAirDetails: (AirContact) -> Unit): MapEngine {
+    val context = LocalContext.current
+    val markers = remember { mutableMapOf<String, Marker>() }
+    /** Translucent uncertainty circles for estimated locations, by detection uid. */
+    val circles = remember { mutableMapOf<String, Polygon>() }
+    /** Exact zoom, so pin groups are redone on every zoom change (not just whole steps). */
+    var zoomExact by remember { mutableStateOf(15.0) }
+    var zoom by remember { mutableStateOf(15) }
+    val cameraLayer = remember { CameraLayer() }
+    val policeLayer = remember { PoliceLayer() }
+    val teamLayer = remember { TeamLayer() }
+    val airLayer = remember { AirLayer() }
+    val heatLayer = remember { HeatLayer() }
+    val driveLayer = remember { DriveLayer() }
+    airLayer.onDetails = onAirDetails
     val (mapView, me) = remember {
         MapCache.configure(context)
         MapView(context).run {
@@ -144,15 +653,15 @@ fun DetectionMap(
             tilesScaleFactor = MapText.scale.value
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(15.0)
-            val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this) { turnNow.get() == MapTurn.HEADING }
+            val me = HeadingUpLocationOverlay(GpsMyLocationProvider(context), this) { ui.turnNow.get() == MapTurn.HEADING }
             // Two fingers turn the map by hand; it then stays where you put it until you reset it.
             overlays.add(object : org.osmdroid.views.overlay.gestures.RotationGestureOverlay(this) {
                 override fun onRotate(deltaAngle: Float) {
                     super.onRotate(deltaAngle)
-                    if (turnNow.get() != MapTurn.FREE) setTurn(MapTurn.FREE)
+                    if (ui.turnNow.get() != MapTurn.FREE) ui.setTurn(MapTurn.FREE)
                 }
             }.apply { isEnabled = true })
-            if (!DemoMode.active) {
+            if (!DemoMode.active && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 me.enableMyLocation()
                 me.enableFollowLocation()
             }
@@ -171,7 +680,7 @@ fun DetectionMap(
             overlays.add(0, MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
                     InfoWindow.closeAllInfoWindowsOn(this@run)
-                    selectedState.value = null
+                    ui.selected.value = null
                     return false
                 }
 
@@ -180,14 +689,16 @@ fun DetectionMap(
             // Follow mode switches itself off when the map is dragged; mirror that into the UI.
             addMapListener(object : MapListener {
                 override fun onScroll(event: ScrollEvent?): Boolean {
-                    following = me.isFollowLocationEnabled
-                    center = mapCenter as GeoPoint
+                    ui.following = me.isFollowLocationEnabled
+                    ui.center = mapCenter as GeoPoint
                     MapState.remember(this@run, me.isFollowLocationEnabled)
                     return false
                 }
 
                 override fun onZoom(event: ZoomEvent?): Boolean {
                     zoom = zoomLevelDouble.roundToInt()
+                    zoomExact = zoomLevelDouble
+                    ui.zoom = zoomLevelDouble
                     MapState.remember(this@run, me.isFollowLocationEnabled)
                     return false
                 }
@@ -195,75 +706,52 @@ fun DetectionMap(
             this to me
         }
     }
-
-    if (showCameras) {
-        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { KnownCameras.ensureLoaded(context) } }
-        // Load cameras around wherever the map is. Polled rather than keyed on the center, which
-        // changes with every GPS fix while following; already-covered areas return immediately.
-        LaunchedEffect(Unit) {
-            while (true) {
-                delay(3_000)
-                val c = center ?: mapView.mapCenter.let { GeoPoint(it.latitude, it.longitude) }
-                // 0,0 is the map's default before any fix - open ocean, nothing to download.
-                if (abs(c.latitude) < 1 && abs(c.longitude) < 1) continue
-                withContext(Dispatchers.IO) { KnownCameras.refreshAround(context, c.latitude, c.longitude) }
-            }
-        }
-    }
-
-    if (showPolice) {
-        LaunchedEffect(Unit) { withContext(Dispatchers.IO) { PoliceData.ensureLoaded(context) } }
-        // Like the cameras: download a city's police data when the map is looking at it.
-        LaunchedEffect(Unit) {
-            val live = Prefs(context).liveCalls
-            while (true) {
-                delay(10_000)
-                val c = center ?: mapView.mapCenter.let { GeoPoint(it.latitude, it.longitude) }
-                if (abs(c.latitude) < 1 && abs(c.longitude) < 1) continue
-                withContext(Dispatchers.IO) { PoliceData.refreshAround(context, c.latitude, c.longitude, live) }
-            }
-        }
-    }
-
-    // "Show on map": stop following, zoom to street level on the spot, and open its pin.
-    val focus by MapFocus.pending.collectAsStateWithLifecycle()
     val focusPin = remember { Marker(mapView) }
-    LaunchedEffect(focus) {
-        val f = focus ?: return@LaunchedEffect
-        me.disableFollowLocation()
-        following = false
-        // After layout and the marker update, so the zoom sticks and the pin exists.
-        mapView.post {
-            val point = GeoPoint(f.lat, f.lon)
-            mapView.mapOrientation = 0f
-            org.osmdroid.views.overlay.infowindow.InfoWindow.closeAllInfoWindowsOn(mapView)
-            // Aircraft move fast: zoom out to a few miles around where it is now, not street level.
-            airLayer.marker(f.uid)?.let {
+    val engine = remember {
+        object : MapEngine {
+            override val lastFix get() = me.lastFix
+            override fun lastFreshBearing() = me.lastFreshBearing()
+            override val isFollowing get() = me.isFollowLocationEnabled
+            override fun follow(on: Boolean) {
+                if (on) {
+                    me.enableFollowLocation()
+                    // From a state- or country-wide view, come in to street level.
+                    if (mapView.zoomLevelDouble < 11.0) mapView.controller.setZoom(15.0)
+                } else me.disableFollowLocation()
+            }
+            override fun setBearing(deg: Float) { mapView.mapOrientation = -deg }
+            override fun bearing() = -mapView.mapOrientation
+            override fun moveTo(lat: Double, lon: Double, zoom: Double, animate: Boolean) {
+                if (animate) mapView.controller.animateTo(GeoPoint(lat, lon), zoom, 600L)
+                else { mapView.controller.setZoom(zoom); mapView.controller.setCenter(GeoPoint(lat, lon)) }
+            }
+            override fun fit(points: List<GeoPoint>) {
+                if (points.isEmpty()) return
+                if (points.size == 1) mapView.controller.animateTo(points[0], 17.0, 600L)
+                else mapView.zoomToBoundingBox(BoundingBox.fromGeoPoints(points).increaseByScale(1.3f), true)
+            }
+            override fun center() = mapView.mapCenter.let { GeoPoint(it.latitude, it.longitude) }
+            override fun startLocation() { me.enableMyLocation(); me.enableFollowLocation() }
+            override fun saveState() = MapState.remember(mapView, me.isFollowLocationEnabled)
+            override fun afterLayout(block: () -> Unit) { mapView.post { block(); mapView.invalidate() } }
+            override fun showTempPin(lat: Double, lon: Double, title: String) {
+                InfoWindow.closeAllInfoWindowsOn(mapView)
+                focusPin.apply {
+                    position = GeoPoint(lat, lon)
+                    this.title = title
+                    snippet = "Strongest signal was here"
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    if (this !in mapView.overlays) mapView.overlays.add(this)
+                }.showInfoWindow()
+            }
+            override fun focusAir(key: String): Boolean {
+                val m = airLayer.marker(key) ?: return false
                 mapView.controller.setZoom(AIR_FOCUS_ZOOM)
-                mapView.controller.setCenter(it.position)
-                it.showInfoWindow()
-                mapView.invalidate()
-                return@post
+                mapView.controller.setCenter(m.position)
+                m.showInfoWindow()
+                return true
             }
-            mapView.controller.setZoom(FOCUS_ZOOM)
-            mapView.controller.setCenter(point)
-            if (f.uid in markers) {
-                selected = f.uid
-                mapView.invalidate()
-                return@post
-            }
-            val pin = focusPin.apply {
-                // Not in the current list (e.g. filtered out): drop a temporary pin instead.
-                position = point
-                title = f.title
-                snippet = "Strongest signal was here"
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                if (this !in mapView.overlays) mapView.overlays.add(this)
-            }
-            pin.showInfoWindow()
-            mapView.invalidate()
         }
-        MapFocus.pending.value = null
     }
 
     // Bigger map text, whenever the setting changes.
@@ -294,175 +782,149 @@ fun DetectionMap(
             }
         }
         lifecycle.addObserver(observer)
+        mapView.onResume()
         onDispose {
             lifecycle.removeObserver(observer)
+            MapState.remember(mapView, me.isFollowLocationEnabled)
             mapView.onDetach()
         }
     }
 
-    val located = detections.filter { it.lat != null && it.lon != null }
-    Box(modifier.clipToBounds()) {
-        AndroidView(factory = { mapView }, update = { map ->
-            if (showCameras) cameraLayer.update(map, wantedCameras, zoom)
-            if (showPolice) policeLayer.update(map, hotspots, liveCalls, zoom)
-            teamLayer.update(map, together, teammates, teamEstimate)
-            airLayer.update(map, air)
-            // Update markers in place so an open info window survives new scan results.
-            val keys = located.mapTo(HashSet()) { it.uid }
-            markers.keys.filterNot(keys::contains).forEach { key ->
-                markers.remove(key)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
+    val located = layers.located
+    /** Each pin's own icon (its category color), to restore after it was highlighted. */
+    val pinIcons = remember { mutableMapOf<String, android.graphics.drawable.Drawable>() }
+    val highlight = remember { highlightPin(context) }
+    /** Bubbles standing in for groups of crowded pins. */
+    val groupMarkers = remember { mutableListOf<Marker>() }
+    AndroidView(factory = { mapView }, update = { map ->
+        zoomExact // read here so every zoom change re-runs this block and regroups the pins
+        heatLayer.update(map, layers.heat)
+        driveLayer.update(map, layers.drive)
+        layers.cameras?.let { cameraLayer.update(map, it, zoom) }
+        if (layers.hotspots != null) policeLayer.update(map, layers.hotspots, layers.live.orEmpty(), zoom)
+        teamLayer.update(map, layers.together, layers.teammates, layers.teamEstimate)
+        airLayer.update(map, layers.air)
+        // Update markers in place so an open info window survives new scan results.
+        val keys = located.mapTo(HashSet()) { it.uid }
+        markers.keys.filterNot(keys::contains).forEach { key ->
+            markers.remove(key)?.let { it.closeInfoWindow(); map.overlays.remove(it) }
+        }
+        circles.keys.filterNot(keys::contains).forEach { key -> circles.remove(key)?.let(map.overlays::remove) }
+        for (d in located) {
+            val marker = markers.getOrPut(d.uid) {
+                Marker(map).apply {
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    icon = ContextCompat.getDrawable(context, org.osmdroid.library.R.drawable.marker_default)
+                        ?.mutate()?.apply { setTint(d.signature?.category.color().toArgb()) }
+                    icon?.let { pinIcons[d.uid] = it }
+                    val uid = d.uid
+                    setOnMarkerClickListener { _, _ ->
+                        InfoWindow.closeAllInfoWindowsOn(map)
+                        ui.selected.value = uid
+                        true
+                    }
+                    map.overlays.add(this)
+                }
             }
-            circles.keys.filterNot(keys::contains).forEach { key -> circles.remove(key)?.let(map.overlays::remove) }
-            for (d in located) {
-                val marker = markers.getOrPut(d.uid) {
-                    Marker(map).apply {
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                        icon = ContextCompat.getDrawable(context, org.osmdroid.library.R.drawable.marker_default)
-                            ?.mutate()?.apply { setTint(d.signature?.category.color().toArgb()) }
-                        val uid = d.uid
-                        setOnMarkerClickListener { _, _ ->
-                            InfoWindow.closeAllInfoWindowsOn(map)
-                            selectedState.value = uid
-                            true
-                        }
-                        map.overlays.add(this)
+            // A pin at the estimated location when there is one, else where it was strongest.
+            val est = Detections.estimate(d)
+            marker.position = est?.let { GeoPoint(it.lat, it.lon) } ?: GeoPoint(d.lat!!, d.lon!!)
+            // A circle is only worth drawing for the pin you tapped, or a matched device whose estimate
+            // is fairly tight. Every nearby device's big circle from one spot just piles up as clutter.
+            if (est != null && showCircle(d, est, layers.selected)) {
+                val circle = circles.getOrPut(d.uid) {
+                    Polygon(map).apply {
+                        val c = d.signature?.category.color().toArgb()
+                        fillPaint.color = (c and 0x00FFFFFF) or 0x30000000
+                        outlinePaint.color = (c and 0x00FFFFFF) or 0x90000000.toInt()
+                        outlinePaint.strokeWidth = 2f
+                        setOnClickListener { _, _, _ -> false } // taps go to the pin
+                        map.overlays.add(map.overlays.indexOf(marker).coerceAtLeast(0), this)
                     }
                 }
-                // A pin at the estimated location when there is one, else where it was strongest.
-                val est = Detections.estimate(d)
-                marker.position = est?.let { GeoPoint(it.lat, it.lon) } ?: GeoPoint(d.lat!!, d.lon!!)
-                if (est != null) {
-                    val circle = circles.getOrPut(d.uid) {
-                        Polygon(map).apply {
-                            val c = d.signature?.category.color().toArgb()
-                            fillPaint.color = (c and 0x00FFFFFF) or 0x30000000
-                            outlinePaint.color = (c and 0x00FFFFFF) or 0x90000000.toInt()
-                            outlinePaint.strokeWidth = 2f
-                            setOnClickListener { _, _, _ -> false } // taps go to the pin
-                            map.overlays.add(map.overlays.indexOf(marker).coerceAtLeast(0), this)
-                        }
-                    }
-                    circle.points = Polygon.pointsAsCircle(GeoPoint(est.lat, est.lon), est.radiusM)
-                } else {
-                    circles.remove(d.uid)?.let(map.overlays::remove)
-                }
-            }
-            map.invalidate()
-        })
-        Column(
-            Modifier.align(Alignment.TopStart).padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            val small = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-            FilledTonalButton(
-                onClick = {
-                    // Heading up <-> North up; from a hand-turned map, back to north first.
-                    val next = if (turn == MapTurn.NORTH) MapTurn.HEADING else MapTurn.NORTH
-                    setTurn(next)
-                    Prefs(context).mapHeadingUp = next == MapTurn.HEADING
-                    if (next == MapTurn.NORTH) mapView.mapOrientation = 0f
-                    else me.lastFreshBearing()?.let { if (me.isFollowLocationEnabled) mapView.mapOrientation = -it }
-                    MapState.remember(mapView, me.isFollowLocationEnabled)
-                },
-                contentPadding = small,
-            ) {
-                Text(when (turn) {
-                    MapTurn.HEADING -> "\u2191 Heading up"
-                    MapTurn.NORTH -> "N\u2191 North up"
-                    MapTurn.FREE -> "N\u2191 Reset to north"
-                })
-            }
-            FilledTonalButton(onClick = { searching = true }, contentPadding = small) { Text("Search a place") }
-            if (together == null) FilledTonalButton(onClick = { joining = true }, contentPadding = small) { Text("Join a search") }
-            onFullScreen?.let { open ->
-                FilledTonalButton(onClick = open, contentPadding = small) { Text(if (fullScreen) "Exit full screen" else "Full screen") }
+                circle.points = Polygon.pointsAsCircle(GeoPoint(est.lat, est.lon), est.radiusM)
+            } else {
+                circles.remove(d.uid)?.let(map.overlays::remove)
             }
         }
-        if (located.isNotEmpty()) {
-            FilledTonalButton(
-                onClick = {
-                    me.disableFollowLocation()
-                    following = false
-                    mapView.mapOrientation = 0f
-                    if (turn == MapTurn.FREE) setTurn(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH)
-                    val points = located.map { d -> Detections.estimate(d)?.let { GeoPoint(it.lat, it.lon) } ?: GeoPoint(d.lat!!, d.lon!!) }
-                    if (points.size == 1) mapView.controller.animateTo(points[0], 17.0, 600L)
-                    else mapView.zoomToBoundingBox(BoundingBox.fromGeoPoints(points).increaseByScale(1.3f), true)
-                },
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-            ) { Text("Show all") }
+        // The chosen pin stands out: bigger and bright, drawn on top of the rest.
+        val chosenUid = layers.selected
+        for ((uid, m) in markers) {
+            val want = if (uid == chosenUid) highlight else pinIcons[uid]
+            if (want != null && m.icon !== want) m.icon = want
         }
-        if (!hasLocation) {
-            // Android 12+ ignores a request for precise location that doesn't also ask for approximate.
-            val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-                val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
-                hasLocation = granted
-                if (granted) {
-                    me.enableMyLocation()
-                    me.enableFollowLocation()
-                    following = true
-                }
+        markers[chosenUid]?.let { m -> map.overlays.remove(m); map.overlays.add(m) }
+        groupPins(map, located, markers, circles, chosenUid, groupMarkers)
+        map.invalidate()
+    })
+    return engine
+}
+
+/** A circle is worth drawing for the chosen pin, or a matched device whose estimate is fairly tight. */
+internal fun showCircle(d: Detection, est: LocationEstimate, selected: String?) =
+    d.uid == selected || (d.signature != null && est.radiusM <= MAX_CIRCLE_M)
+
+/** History heatmap on the classic map: a soft red glow per flagged encounter, adding up where they cluster. */
+private class HeatLayer {
+    private var shown: List<GeoPoint>? = null
+    private val overlay = object : Overlay() {
+        var points: List<GeoPoint> = emptyList()
+        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        override fun draw(canvas: android.graphics.Canvas, mapView: MapView, shadow: Boolean) {
+            if (shadow || points.isEmpty()) return
+            val r = 28 * mapView.resources.displayMetrics.density
+            val proj = mapView.projection
+            val p = android.graphics.Point()
+            for (g in points) {
+                proj.toPixels(g, p)
+                if (p.x < -r || p.y < -r || p.x > mapView.width + r || p.y > mapView.height + r) continue
+                paint.shader = android.graphics.RadialGradient(
+                    p.x.toFloat(), p.y.toFloat(), r, intArrayOf(0x66FF1744, 0x33FF9100, 0x00FF9100), null,
+                    android.graphics.Shader.TileMode.CLAMP,
+                )
+                canvas.drawCircle(p.x.toFloat(), p.y.toFloat(), r, paint)
             }
-            Card(Modifier.align(Alignment.Center).padding(24.dp)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Location is off for Siren", style = MaterialTheme.typography.titleMedium)
-                    Text("The map needs it to show where you are and the plate readers around you.")
-                    Button(onClick = {
-                        permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                    }) { Text("Allow location") }
-                }
+        }
+    }
+
+    fun update(map: MapView, points: List<GeoPoint>) {
+        if (points === shown) return
+        shown = points
+        overlay.points = points
+        if (overlay !in map.overlays) map.overlays.add(1.coerceAtMost(map.overlays.size), overlay) // just above the tap catcher
+    }
+}
+
+/** A recorded drive: its route as a blue line, and the flagged equipment seen along it as dots. */
+private class DriveLayer {
+    private var shown: Traces.Shown? = null
+    private val overlays = mutableListOf<Overlay>()
+
+    fun update(map: MapView, drive: Traces.Shown?) {
+        if (drive === shown) return
+        shown = drive
+        overlays.forEach { (it as? Marker)?.closeInfoWindow() }
+        map.overlays.removeAll(overlays.toSet())
+        overlays.clear()
+        if (drive == null) return
+        overlays += org.osmdroid.views.overlay.Polyline(map).apply {
+            setPoints(drive.points.map { GeoPoint(it.lat, it.lon) })
+            outlinePaint.color = 0xCC1E88E5.toInt()
+            outlinePaint.strokeWidth = 6 * map.resources.displayMetrics.density
+            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+        }
+        for (d in drive.flagged) {
+            val lat = d.estimate?.lat ?: d.lat ?: continue
+            val lon = d.estimate?.lon ?: d.lon ?: continue
+            overlays += Marker(map).apply {
+                position = GeoPoint(lat, lon)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = android.graphics.drawable.BitmapDrawable(map.resources, LocationMarker.dot(map.context, d.signature?.category.color().toArgb()))
+                title = d.title
+                snippet = "${d.source.label} · ${time(map.context, d.firstSeen)}"
             }
         }
-        val chosen = selected?.let { uid -> located.firstOrNull { it.uid == uid } }
-        if (chosen != null) {
-            PinCard(
-                chosen,
-                onDetails = { onDetails(chosen) },
-                onHide = { selected = null; onHide(chosen) },
-                onClose = { selected = null },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp),
-            )
-        }
-        if (joining) JoinSearchDialog { joining = false }
-        if (together != null && chosen == null) {
-            SearchCard(Modifier.align(Alignment.BottomStart).padding(8.dp).fillMaxWidth(0.72f))
-        } else searched?.let { place ->
-            if (chosen == null) PlaceCard(
-                place, cameras, hotspots, liveCalls,
-                onClose = { searched = null; MapState.searched = null },
-                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp).fillMaxWidth(0.72f),
-            )
-        }
-        if (searching) PlaceSearchDialog(
-            onDismiss = { searching = false },
-            onPick = { place ->
-                searching = false
-                me.disableFollowLocation()
-                following = false
-                mapView.mapOrientation = 0f
-                if (turn == MapTurn.FREE) setTurn(if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH)
-                mapView.controller.setZoom(12.0)
-                mapView.controller.setCenter(GeoPoint(place.lat, place.lon))
-                center = GeoPoint(place.lat, place.lon)
-                MapState.remember(mapView, false)
-                searched = place
-                MapState.searched = place
-            },
-        )
-        if (!following && hasLocation && chosen == null) {
-            FilledTonalButton(
-                onClick = {
-                    me.enableFollowLocation()
-                    following = true
-                    // Following again: back to your chosen mode rather than the hand-turned angle.
-                    val mode = if (Prefs(context).mapHeadingUp) MapTurn.HEADING else MapTurn.NORTH
-                    setTurn(mode)
-                    if (mode == MapTurn.NORTH) mapView.mapOrientation = 0f
-                    if (mapView.zoomLevelDouble < 15.0) mapView.controller.setZoom(16.0)
-                },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-            ) { Text("Follow me") }
-        }
+        map.overlays.addAll(1.coerceAtMost(map.overlays.size), overlays)
     }
 }
 
@@ -571,6 +1033,102 @@ private fun PlaceCard(
     }
 }
 
+internal fun highlightPinDrawable(ctx: android.content.Context) = highlightPin(ctx)
+
+/** The chosen pin: half again as big, bright cyan with a white rim, so it stands out among gray ones. */
+private fun highlightPin(ctx: android.content.Context): android.graphics.drawable.Drawable {
+    val base = ContextCompat.getDrawable(ctx, org.osmdroid.library.R.drawable.marker_default)!!
+    val w = (base.intrinsicWidth * 1.6).toInt(); val h = (base.intrinsicHeight * 1.6).toInt()
+    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(bmp)
+    base.mutate().apply { setTint(0xFFFFFFFF.toInt()); setBounds(0, 0, w, h); draw(c) }
+    val inset = (w * 0.09).toInt()
+    ContextCompat.getDrawable(ctx, org.osmdroid.library.R.drawable.marker_default)!!.mutate().apply {
+        setTint(0xFF00B8D4.toInt()); setBounds(inset, inset, w - inset, h - inset); draw(c)
+    }
+    return android.graphics.drawable.BitmapDrawable(ctx.resources, bmp)
+}
+
+/**
+ * Where pins pile up (hundreds on All nearby), groups of overlapping everyday pins become one
+ * bubble with a count; tap it to zoom in. Matched devices and the chosen pin are never grouped,
+ * and from street level up every pin shows.
+ */
+private fun groupPins(
+    map: MapView,
+    located: List<Detection>,
+    markers: Map<String, Marker>,
+    circles: Map<String, Polygon>,
+    chosenUid: String?,
+    groupMarkers: MutableList<Marker>,
+) {
+    map.overlays.removeAll(groupMarkers.toSet())
+    groupMarkers.clear()
+    markers.values.forEach { it.isEnabled = true }
+    circles.values.forEach { it.isEnabled = true }
+    if (map.width == 0 || map.zoomLevelDouble >= GROUP_UNTIL_ZOOM) return
+    val radiusPx = 36 * map.resources.displayMetrics.density
+    val proj = map.projection
+    data class Group(var x: Float, var y: Float, val members: MutableList<String>)
+    val groups = ArrayList<Group>()
+    for (d in located) {
+        if (d.signature != null || d.uid == chosenUid) continue
+        val m = markers[d.uid] ?: continue
+        val p = proj.toPixels(m.position, null)
+        val g = groups.firstOrNull { kotlin.math.hypot(it.x - p.x, it.y - p.y) < radiusPx }
+        if (g == null) groups += Group(p.x.toFloat(), p.y.toFloat(), mutableListOf(d.uid)) else g.members += d.uid
+    }
+    val res = map.resources
+    for (g in groups.filter { it.members.size >= GROUP_MIN }) {
+        g.members.forEach { markers[it]?.isEnabled = false; circles[it]?.isEnabled = false }
+        val at = g.members.mapNotNull { markers[it]?.position }
+        val center = GeoPoint(at.sumOf { it.latitude } / at.size, at.sumOf { it.longitude } / at.size)
+        groupMarkers += Marker(map).apply {
+            position = center
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = android.graphics.drawable.BitmapDrawable(res, countBubble(map.context, g.members.size))
+            setOnMarkerClickListener { _, mv -> mv.controller.animateTo(center, mv.zoomLevelDouble + 2, 400L); true }
+        }
+    }
+    // Under the regular pins' layer order doesn't matter much; on top so the count is readable.
+    map.overlays.addAll(groupMarkers)
+}
+
+/** A gray disc with a white rim and the number of pins it stands for. */
+private fun countBubble(ctx: android.content.Context, n: Int): android.graphics.Bitmap {
+    val d = ctx.resources.displayMetrics.density
+    val size = ((if (n >= 100) 40 else 34) * d).toInt()
+    val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(bmp)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    paint.color = 0xFFFFFFFF.toInt(); c.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+    paint.color = 0xFF546E7A.toInt(); c.drawCircle(size / 2f, size / 2f, size / 2f - 2.5f * d, paint)
+    paint.color = 0xFFFFFFFF.toInt(); paint.textSize = 14 * d; paint.textAlign = android.graphics.Paint.Align.CENTER
+    paint.isFakeBoldText = true
+    c.drawText(n.toString(), size / 2f, size / 2f - (paint.descent() + paint.ascent()) / 2, paint)
+    return bmp
+}
+
+/** Pins group into count bubbles below this zoom (street level and closer shows them all). */
+private const val GROUP_UNTIL_ZOOM = 18.0
+private const val GROUP_MIN = 4
+
+/** Matched devices only show their estimate circle once it's within this radius (the tapped one always). */
+internal const val MAX_CIRCLE_M = 150.0
+
+/** The pin card on a short map: one line, so it doesn't cover the map. */
+@Composable
+private fun SlimPinCard(d: Detection, onDetails: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    Card(modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(d.name ?: d.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            TextButton(onClick = onDetails) { Text("Details") }
+            TextButton(onClick = onClose) { Text("Close") }
+        }
+    }
+}
+
 /** What a tapped pin is, with the same actions as the list: details, and hiding it. */
 @Composable
 private fun PinCard(d: Detection, onDetails: () -> Unit, onHide: () -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
@@ -584,7 +1142,8 @@ private fun PinCard(d: Detection, onDetails: () -> Unit, onHide: () -> Unit, onC
             Text(
                 buildString {
                     append("${d.source.label} · ${d.id}")
-                    if (d.source != Source.RF) append(" · strongest ${d.bestRssi} dBm")
+                    // 0 means Android gave no signal reading (some Wi-Fi results), not a strong one.
+                    if (d.source != Source.RF) append(if (d.bestRssi < 0) " · strongest ${d.bestRssi} dBm" else " · no signal reading")
                 },
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -868,7 +1427,7 @@ private class CameraLayer {
     }
 }
 
-private fun time(context: android.content.Context, millis: Long) =
+internal fun time(context: android.content.Context, millis: Long) =
     DateUtils.formatDateTime(context, millis, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_ABBREV_MONTH or DateUtils.FORMAT_SHOW_TIME)
 
 /**
@@ -929,6 +1488,14 @@ object MapState {
     /** The place last searched for, so its card survives switching to full screen and back. */
     var searched: Geocoder.Place? = null
 
+    fun rememberRaw(lat: Double, lon: Double, zoom: Double, orientation: Float, following: Boolean) {
+        if (abs(lat) < 1 && abs(lon) < 1) return
+        center = GeoPoint(lat, lon)
+        this.zoom = zoom
+        this.following = following
+        this.orientation = orientation
+    }
+
     fun remember(map: MapView, following: Boolean) {
         val c = map.mapCenter
         if (abs(c.latitude) < 1 && abs(c.longitude) < 1) return // the default before any fix
@@ -960,3 +1527,32 @@ private val COMPASS = listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
 
 /** "N", "NE"… for a bearing in degrees. */
 fun compass(bearing: Float) = COMPASS[((((bearing % 360f) + 360f + 22.5f) % 360f) / 45f).toInt()]
+
+/** The red alert bar across the top of the map: what's detected, how close, and how many more. */
+@Composable
+private fun AlertBar(alerts: List<Detection>, modifier: Modifier, onTap: (Detection) -> Unit) {
+    val strongest = alerts.maxBy { it.rssi }
+    // Flash when something new shows up.
+    var seen by remember { mutableStateOf(emptySet<String>()) }
+    val flash = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(alerts.map { it.uid }.toSet()) {
+        val now = alerts.mapTo(HashSet()) { it.uid }
+        if ((now - seen).isNotEmpty()) repeat(3) { flash.animateTo(1f, androidx.compose.animation.core.tween(180)); flash.animateTo(0f, androidx.compose.animation.core.tween(260)) }
+        seen = now
+    }
+    val red = Color(0xFFE53935)
+    Card(
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.lerp(red, Color.White, flash.value * 0.55f)),
+        modifier = modifier.fillMaxWidth().clickable { onTap(strongest) },
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "\u26A0 ${strongest.signature?.label ?: strongest.title}" +
+                    (if (strongest.source != Source.RF) " \u00B7 ${away(distanceText(strongest))}" else "") +
+                    (if (alerts.size > 1) " (+${alerts.size - 1} more)" else ""),
+                color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+    }
+}

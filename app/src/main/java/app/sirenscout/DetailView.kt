@@ -169,6 +169,9 @@ fun DetailDialog(
                                     }
                                     Switch(checked = beep, onCheckedChange = { beep = it })
                                 }
+                                var sweeping by remember { mutableStateOf(false) }
+                                OutlinedButton(onClick = { sweeping = true }) { Text("Find its direction (chest sweep)…") }
+                                if (sweeping) ChestSweepDialog(d) { sweeping = false }
                             }
                         }
                     }
@@ -202,6 +205,9 @@ fun DetailDialog(
                     d.adSummary?.let { Info("What it advertises", it) }
                     Info("Heard on", d.source.label + (WifiBands.band(d.id)?.takeIf { d.source == Source.WIFI }?.let { ", $it band" } ?: ""))
                     Info(if (d.source == Source.RF) "Frequency" else "Address", d.id)
+                    if (d.previousIds.isNotEmpty()) {
+                        Info("Earlier addresses", d.previousIds.joinToString(", ") + " (it switched addresses; Siren kept following it)")
+                    }
                     Info("First seen", time.format(Date(d.firstSeen)))
                     Info("Last seen", "${time.format(Date(d.lastSeen))} (${ago(now, d.lastSeen)})")
                     Info("Times picked up", "${d.count}")

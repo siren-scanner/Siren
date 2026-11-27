@@ -45,6 +45,8 @@ object Trackers {
 
     private val TILE_UUIDS = setOf(0xFEED, 0xFEEC, 0xFD84)
     private const val SMARTTAG_UUID = 0xFD5A
+    /** A SmartTag not yet set up with an account (after RF Sentinel's list; arXiv 2210.14702). */
+    private const val SMARTTAG_SETUP_UUID = 0xFD59
     /** Google's Find Hub network reuses the Eddystone service with its own frame types. */
     private const val EDDYSTONE_UUID = 0xFEAA
     /**
@@ -75,7 +77,7 @@ object Trackers {
         val uuids = services + serviceData.keys
         if (DULT_UUID in uuids) return DULT
         if (uuids.any { it in TILE_UUIDS }) return TILE
-        if (SMARTTAG_UUID in uuids) return SMARTTAG
+        if (SMARTTAG_UUID in uuids || SMARTTAG_SETUP_UUID in uuids) return SMARTTAG
         serviceData[EDDYSTONE_UUID]?.firstOrNull()?.let { frame ->
             if (frame.toInt() and 0xFF == FIND_HUB_SEPARATED_FRAME) return GOOGLE
         }
@@ -84,7 +86,7 @@ object Trackers {
 
     /** The Find My "separated" prefix, for a screen-off scan filter. */
     val appleFilterData = byteArrayOf(FIND_MY_TYPE.toByte(), FIND_MY_SEPARATED_LEN.toByte())
-    val filterUuids16 = TILE_UUIDS + SMARTTAG_UUID + DULT_UUID
+    val filterUuids16 = TILE_UUIDS + SMARTTAG_UUID + SMARTTAG_SETUP_UUID + DULT_UUID
 }
 
 /** Tracker types the user has said are theirs; their alerts are muted for a day. */

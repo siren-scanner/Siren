@@ -92,4 +92,20 @@ class SearchTogetherTest {
         assertEquals(MeshRadios.Kind.MESHTASTIC, MeshRadios.kind("Meshtastic_ab12"))
         assertEquals(MeshRadios.Kind.UNKNOWN, MeshRadios.kind("T-Echo"))
     }
+
+    @Test
+    fun `the QR code a camera reads back is a join link with the code`() {
+        val link = SearchTogether.joinLink(code)
+        val matrix = com.google.zxing.qrcode.QRCodeWriter().encode(link, com.google.zxing.BarcodeFormat.QR_CODE, 0, 0)
+        val w = matrix.width; val h = matrix.height
+        val pixels = IntArray(w * h) { if (matrix[it % w, it / w]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
+        val read = com.google.zxing.qrcode.QRCodeReader().decode(
+            com.google.zxing.BinaryBitmap(com.google.zxing.common.HybridBinarizer(com.google.zxing.RGBLuminanceSource(w, h, pixels))),
+            mapOf(com.google.zxing.DecodeHintType.PURE_BARCODE to true),
+        ).text
+        assertEquals(link, read)
+        assertEquals(code, SearchTogether.codeFromLink(read))
+        assertNull(SearchTogether.codeFromLink("https://example.com/join/ABCD2345EF"))
+        assertNull(SearchTogether.codeFromLink("siren://join/TOOSHORT"))
+    }
 }

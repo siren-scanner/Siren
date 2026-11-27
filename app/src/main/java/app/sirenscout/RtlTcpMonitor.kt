@@ -38,13 +38,23 @@ class RtlTcpMonitor(
     private val bands: List<RadioBand> = emptyList(),
     private val bandThresholdDb: Float = 15f,
     private val onBandHit: (RadioBand, ChannelFloors.Hit) -> Unit = { _, _ -> },
+    /** Listen for tire-pressure sensors on 315 MHz between sweeps. */
+    private val tireSensors: Boolean = false,
+    private val onTireFrame: (Tpms.Frame) -> Unit = {},
+    /**
+     * Before each connection attempt: (re)starts a local driver if needed and returns why it can't
+     * run (shown as the status), else null. Lets a dongle that dropped out come back by itself.
+     */
+    private val beforeConnect: () -> String? = { null },
+    /** A secret to send first (Siren's built-in driver), or null for a plain rtl_tcp server. */
+    private val handshake: () -> ByteArray? = { null },
 ) {
     private val analyzer = BandAnalyzer(SAMPLE_RATE)
     /** Kept across reconnects, so a dropped connection doesn't restart learning. */
     private val bandFloors = bands.associate { it.id to ChannelFloors(bandThresholdDb) }
 
     suspend fun run() = withContext(Dispatchers.IO) {
-        if (freqsHz.isEmpty() && bands.isEmpty()) {
+        if (freqsHz.isEmpty() && bands.isEmpty() && !tireSensors) {
             onStatus("no frequencies or bands configured")
             return@withContext
         }
@@ -52,16 +62,25 @@ class RtlTcpMonitor(
         var sweeps = 0
         while (isActive) {
             try {
-                Socket().use { socket ->
+                val why = beforeConnect()
+                if (why != null) {
+                    onStatus(why)
+                    delay(3000)
+                } else Socket().use { socket ->
                     onStatus("connecting to $host:$port…")
                     socket.connect(InetSocketAddress(host, port), 3000)
+                    handshake()?.let { socket.getOutputStream().apply { write(it); flush() } }
                     socket.soTimeout = 5000
                     sweeps = session(socket, floors, sweeps)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
-                onStatus("${e.message ?: "connection failed"} - retrying")
+                onStatus(
+                    if (e is java.net.ConnectException || e.message?.contains("ECONNREFUSED") == true || e is java.net.SocketTimeoutException)
+                        (if (host == "127.0.0.1" || host == "localhost") "dongle not connected - retrying" else "can't reach the radio at $host:$port - retrying")
+                    else "radio connection lost - retrying",
+                )
                 delay(3000)
             }
         }
@@ -121,10 +140,24 @@ class RtlTcpMonitor(
                     floors.update(analyzer.channelPowers(measure, center, band))?.let { onBandHit(band, it) }
                 }
             }
+            // Tire sensors send a short burst about once a minute while driving: listen a few seconds each round.
+            if (tireSensors) {
+                command(CMD_FREQ, Tpms.TUNE_HZ.toInt())
+                input.readFully(settle)
+                var tail = ByteArray(0)
+                repeat(TIRE_LISTEN_CHUNKS) {
+                    val chunk = ByteArray(TIRE_CHUNK_BYTES)
+                    input.readFully(chunk)
+                    // A little of the previous chunk too, so a message split between chunks still decodes.
+                    Tpms.decode(tail + chunk, alreadyCoveredBytes = tail.size).forEach(onTireFrame)
+                    tail = chunk.copyOfRange(chunk.size - TIRE_OVERLAP_BYTES, chunk.size)
+                }
+            }
             sweeps++
             val what = listOfNotNull(
                 freqsHz.size.takeIf { it > 0 }?.let { "$it freqs" },
                 bands.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.label },
+                "tire sensors".takeIf { tireSensors },
             ).joinToString(" + ")
             val learning = sweeps < WARMUP_SWEEPS || bandFloors.values.any { it.learning }
             onStatus(
@@ -181,6 +214,10 @@ class RtlTcpMonitor(
         private const val SETTLE_BYTES = 196_608 // ~96 ms of IQ data
         private const val MEASURE_BYTES = 131_072 // ~64 ms of IQ data
         private const val WARMUP_SWEEPS = 5
+        /** Half a second of I/Q per decode, 6 per round: 3 s on 315 MHz each sweep. */
+        private const val TIRE_CHUNK_BYTES = 1_024_000
+        private const val TIRE_LISTEN_CHUNKS = 6
+        private const val TIRE_OVERLAP_BYTES = 65_536
 
         // IF_OFFSET_HZ / SAMPLE_RATE = 125/512, so the local oscillator repeats every 512 samples.
         private const val LO_LEN = 512

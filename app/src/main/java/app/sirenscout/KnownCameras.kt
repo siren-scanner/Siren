@@ -67,7 +67,12 @@ object KnownCameras {
         "https://overpass.kumi.systems/api/interpreter",
         "https://overpass.private.coffee/api/interpreter",
     )
-    private const val RETRY_AFTER_FAILURE_MS = 2 * 60_000L
+    /**
+     * After every server failed, wait before trying again - longer each time it keeps failing
+     * (2, 5, 10, then 30 minutes), back to normal after a success.
+     */
+    internal val RETRY_DELAYS_MS = longArrayOf(2 * 60_000L, 5 * 60_000L, 10 * 60_000L, 30 * 60_000L)
+    private var failures = 0
 
     private data class Area(val lat: Double, val lon: Double, val fetchedAt: Long)
 
@@ -100,9 +105,14 @@ object KnownCameras {
                 .getOrNull()
         }
         if (fetched == null) {
-            nextAttemptAt = now + RETRY_AFTER_FAILURE_MS
+            // From now, not from when this attempt started: three timeouts take minutes, so a wait
+            // counted from the start had already passed and it retried straight away.
+            nextAttemptAt = System.currentTimeMillis() + RETRY_DELAYS_MS[minOf(failures, RETRY_DELAYS_MS.size - 1)]
+            failures++
             return@withLock
         }
+        failures = 0
+        nextAttemptAt = 0L
         val merged = (_cameras.value.associateBy { it.id } + fetched.associateBy { it.id }).values.toList()
         areas = areas.filter { now - it.fetchedAt < MAX_AGE_MS } + Area(qLat, qLon, now)
         _cameras.value = merged
@@ -118,7 +128,8 @@ object KnownCameras {
         try {
             conn.requestMethod = "POST"
             conn.connectTimeout = 15_000
-            conn.readTimeout = 60_000
+            // Move on from a stuck server sooner (the query itself asks the server for at most 25 s).
+            conn.readTimeout = 30_000
             conn.doOutput = true
             conn.setRequestProperty("User-Agent", "SirenScout/0.1 (Android)")
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
@@ -321,3 +332,15 @@ fun camerasAhead(
     if (heading != null && d > 30 && angleBetween(bearingDeg(lat, lon, c.lat, c.lon), heading) > 60f) return@mapNotNull null
     c to d
 }.sortedBy { it.second }
+
+/** The point [meters] from here along [bearing] (degrees), on a sphere: (lat, lon). */
+fun pointAhead(lat: Double, lon: Double, bearing: Float, meters: Double): Pair<Double, Double> {
+    val r = 6_371_000.0
+    val d = meters / r
+    val b = Math.toRadians(bearing.toDouble())
+    val p1 = Math.toRadians(lat)
+    val l1 = Math.toRadians(lon)
+    val p2 = Math.asin(sin(p1) * cos(d) + cos(p1) * sin(d) * cos(b))
+    val l2 = l1 + atan2(sin(b) * sin(d) * cos(p1), cos(d) - sin(p1) * sin(p2))
+    return Math.toDegrees(p2) to ((Math.toDegrees(l2) + 540) % 360 - 180)
+}
